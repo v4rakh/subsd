@@ -1,0 +1,53 @@
+version: "2"
+run:
+  allow-parallel-runners: true
+linters:
+  default: none
+  enable:
+    - containedctx
+    - copyloopvar
+    - dupl
+    - errcheck
+    - errname
+    - exhaustive
+    - ginkgolinter
+    - goconst
+    - gocyclo
+    - gosec
+    - govet
+    - importas
+    - ineffassign
+    - intrange
+    - makezero
+    - misspell
+    - nakedret
+    - nilerr
+    - nilnil
+    - noctx
+    - perfsprint
+    - prealloc
+    - predeclared
+    - protogetter
+    - revive
+    - sqlclosecheck
+    - staticcheck
+    - tagalign
+    - unconvert
+    - unparam
+    - unused
+    - usetesting
+    - whitespace
+  settings:
+    dupl:
+      threshold: 200
+    revive:
+      rules:
+        - name: comment-spacings
+  exclusions:
+    generated: strict
+    paths:
+      - _test\.go
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -1,0 +1,12 @@
+runs:
+  using: "composite"
+  steps:
+    - name: Security scan
+      shell: bash
+      run: |
+        make scan
+    - name: Native - security scan result archival
+      uses: actions/upload-artifact@v3
+      with:
+        name: grype.txt
+        path: bin/grype.txt

@@ -1,0 +1,36 @@
+inputs:
+  version:
+    description: "version to use"
+    required: true
+    type: string
+  token:
+    description: "forgejo token to use to publish"
+    required: true
+    type: string
+runs:
+  using: "composite"
+  steps:
+    - name: Upload artifacts
+      uses: ./.forgejo/actions/forgejo-release
+      with:
+        url: https://git.myservermanager.com
+        repo: varakh/subsd
+        token: ${{ inputs.token }}
+        tag: ${{ inputs.version }}
+        direction: upload
+        release-dir: bin
+        release-notes: "Release of version '${{ inputs.version }}'."
+    - name: Delete latest tag if exists
+      shell: bash
+      run: |
+        git fetch --tags --force
+        if git rev-parse latest >/dev/null 2>&1; then
+          git tag -d latest
+          git push origin --delete latest
+        fi
+    - name: Create latest tag on released commit
+      shell: bash
+      run: |
+        TAG_COMMIT=$(git rev-list -n 1 ${{ inputs.version }})
+        git tag latest "$TAG_COMMIT"
+        git push origin latest

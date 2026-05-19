@@ -1,0 +1,35 @@
+{
+	"extends": ["stylelint-config-standard", "stylelint-prettier/recommended"],
+	"plugins": ["stylelint-order", "stylelint-declaration-block-no-ignored-properties", "stylelint-prettier"],
+	"rules": {
+		"at-rule-no-unknown": [true, {"ignoreAtRules": ["theme", "custom-variant"]}],
+		"import-notation": "string",
+		"comment-empty-line-before": null,
+		"selector-class-pattern": null,
+		"function-name-case": [
+			"lower",
+			{
+				"ignoreFunctions": []
+			}
+		],
+		"no-invalid-double-slash-comments": null,
+		"no-descending-specificity": null,
+		"declaration-empty-line-before": null,
+		"selector-pseudo-element-colon-notation": "single",
+		"selector-pseudo-class-no-unknown": [
+			true,
+			{
+				"ignorePseudoClasses": ["global"]
+			}
+		],
+		"prettier/prettier": true
+	},
+	"ignoreFiles": [
+		"**/*.json",
+		"**/*.svg",
+		"**/*.ts",
+		"**/*.tsx",
+		"**/*.js",
+		"node_modules/"
+	]
+}

@@ -1,0 +1,12 @@
+!.env.example
+ci/*
+!ci/.keep
+*.local
+.env
+.env.*
+.eslintcache
+.stylelintcache
+dist/
+node_modules/
+package-lock.json
+coverage

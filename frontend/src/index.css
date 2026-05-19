@@ -1,0 +1,200 @@
+@import '@fontsource/jetbrains-mono/300.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+@import '@fontsource/syne/400.css';
+@import '@fontsource/syne/600.css';
+@import '@fontsource/syne/700.css';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+/* Dark mode via .dark class on <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+	/* ── Our tokens ── */
+	--color-bg: var(--bg);
+	--color-bg1: var(--bg1);
+	--color-bg2: var(--bg2);
+	--color-bg3: var(--bg3);
+	--color-bg4: var(--bg4);
+	--color-dim: var(--dim);
+	--color-subtle: var(--subtle);
+	--color-text: var(--text);
+	--color-bright: var(--bright);
+	--color-brand: var(--brand);
+	--color-brand2: var(--brand2);
+	--color-green: var(--green);
+	--color-red: var(--red);
+	--color-amber: var(--amber);
+
+	/* ── shadcn tokens ── */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+	--font-ui: 'Syne', sans-serif;
+	--font-sans: var(--font-mono);
+	--font-heading: var(--font-mono);
+	--spacing-bar: var(--bar-h);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ── Light theme ── */
+:root {
+	--bg: #f5f5f7;
+	--bg1: #fff;
+	--bg2: #ebebed;
+	--bg3: #e0e0e4;
+	--bg4: #d4d4da;
+	--dim: #9090a0;
+	--subtle: #707080;
+	--text: #2a2a35;
+	--bright: #0a0a0f;
+	--brand: #4a6fe8;
+	--brand2: #1fa8a8;
+	--green: #1a9e50;
+	--red: #cc3030;
+	--amber: #c07010;
+	--bar-h: 76px;
+	--background: var(--bg);
+	--foreground: var(--text);
+	--card: var(--bg1);
+	--card-foreground: var(--text);
+	--popover: var(--bg1);
+	--popover-foreground: var(--text);
+	--primary: var(--brand);
+	--primary-foreground: #fff;
+	--secondary: var(--bg2);
+	--secondary-foreground: var(--text);
+	--muted: var(--bg2);
+	--muted-foreground: var(--dim);
+	--accent: var(--bg3);
+	--accent-foreground: var(--text);
+	--destructive: var(--red);
+	--border: #e2e2e8;
+	--input: var(--bg3);
+	--ring: var(--brand);
+	--radius: 0.375rem;
+}
+
+/* ── Dark theme ── */
+.dark {
+	--bg: #0a0a0b;
+	--bg1: #111113;
+	--bg2: #18181b;
+	--bg3: #222226;
+	--bg4: #2c2c32;
+	--dim: #787892;
+	--subtle: #9494ac;
+	--text: #c0c0ce;
+	--bright: #ebebf5;
+	--brand: #6c8eff;
+	--brand2: #3ecfcf;
+	--green: #3ddc84;
+	--red: #e05c5c;
+	--amber: #e8a930;
+	--background: var(--bg);
+	--foreground: var(--text);
+	--card: var(--bg1);
+	--card-foreground: var(--text);
+	--popover: var(--bg2);
+	--popover-foreground: var(--text);
+	--primary: var(--brand);
+	--primary-foreground: var(--bg);
+	--secondary: var(--bg2);
+	--secondary-foreground: var(--text);
+	--muted: var(--bg3);
+	--muted-foreground: var(--dim);
+	--accent: var(--bg3);
+	--accent-foreground: var(--text);
+	--destructive: var(--red);
+	--border: #2a2a30;
+	--input: var(--bg4);
+	--ring: var(--brand);
+}
+
+/* ── Base ── */
+*,
+*:before,
+*:after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	overflow: hidden;
+}
+
+body {
+	font-family: var(--font-mono);
+	background: var(--bg);
+	color: var(--text);
+	font-size: 16px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+button {
+	font-family: var(--font-mono);
+}
+
+input {
+	font-family: var(--font-mono);
+}
+
+img {
+	display: block;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+	width: 3px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--bg4);
+	border-radius: 2px;
+}
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--bg4) transparent;
+}
+
+/* ── Shared utilities ── */
+.label-ui {
+	font-family: var(--font-ui);
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--dim);
+}

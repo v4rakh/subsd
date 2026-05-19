@@ -1,0 +1,12 @@
+inputs:
+  version:
+    description: "version to use"
+    required: true
+    type: string
+runs:
+  using: "composite"
+  steps:
+    - name: Build, Checkstyle, Test
+      shell: bash
+      run: |
+        make clean dependencies build checkstyle test

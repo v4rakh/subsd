@@ -1,0 +1,16 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    runs-on: native
+    steps:
+      - uses: actions/checkout@v3
+        name: Checkout
+      - uses: ./.forgejo/actions/build
+        name: Build
+      - uses: ./.forgejo/actions/scan
+        name: Scan

@@ -1,0 +1,29 @@
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "version to use"
+        required: true
+        type: string
+jobs:
+  release:
+    runs-on: native
+    steps:
+      - uses: actions/checkout@v3
+        name: Checkout
+      - uses: ./.forgejo/actions/build
+        name: Build
+        with:
+          version: ${{ inputs.version }}
+      - uses: ./.forgejo/actions/scan
+        name: Scan
+        with:
+          version: ${{ inputs.version }}
+          registryFQDN: git.myservermanager.com
+          registryUser: ${{ secrets.FORGE_USER }}
+          registryPass: ${{ secrets.FORGE_TOKEN }}
+      - uses: ./.forgejo/actions/release
+        name: Release
+        with:
+          version: ${{ inputs.version }}
+          token: ${{ secrets.FORGE_TOKEN }}

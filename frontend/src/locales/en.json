@@ -1,0 +1,100 @@
+{
+  "albumPanel": {
+    "defaultTitle": "Albums",
+    "enqueueTitle": "Add album to queue",
+    "noAlbums": "No albums",
+    "playTitle": "Play album now",
+    "searchPlaceholder": "search albums…",
+    "selectArtist": "Select an artist"
+  },
+  "artistPanel": {
+    "albums": "albums",
+    "empty": "No artists",
+    "searchPlaceholder": "search…",
+    "title": "Artists"
+  },
+  "connecting": "Connecting…",
+  "login": {
+    "placeholder": "Token",
+    "submit": "unlock",
+    "wrongToken": "Wrong token."
+  },
+  "nowPlaying": {
+    "audioDevice": "Audio output device",
+    "connected": "Connected to server",
+    "darkMode": "Dark mode",
+    "disconnected": "Disconnected — reconnecting…",
+    "lightMode": "Light mode",
+    "next": "Next",
+    "pause": "Pause",
+    "play": "Play",
+    "previous": "Previous",
+    "repeat": "Repeat",
+    "scrobbleError": "Last scrobble failed",
+    "scrobbleOk": "Last scrobble succeeded",
+    "seek": "Seek",
+    "shuffle": "Shuffle",
+    "volume": "Volume"
+  },
+  "playlistPanel": {
+    "empty": "No playlists",
+    "enqueuePlaylistTitle": "Add playlist to queue",
+    "enqueueSongTitle": "Add track to queue",
+    "noTracks": "No tracks",
+    "playAll": "play all",
+    "playPlaylistTitle": "Play playlist now",
+    "playSongTitle": "Play track now",
+    "queueAll": "+ queue all",
+    "title": "Playlists",
+    "tracks": "tracks"
+  },
+  "queuePanel": {
+    "clearButton": "clear",
+    "clearTitle": "Clear queue",
+    "empty": "Queue is empty",
+    "removeTitle": "Remove from queue",
+    "searchPlaceholder": "search queue…",
+    "title": "Queue"
+  },
+  "searchPanel": {
+    "hint": "Type to search",
+    "noResults": "No results",
+    "placeholder": "search artists, albums, tracks…",
+    "title": "Search"
+  },
+  "shortcuts": {
+    "nextTrack": "Next track",
+    "playPause": "Play / Pause",
+    "prevTrack": "Previous track",
+    "search": "Search",
+    "showShortcuts": "Show shortcuts",
+    "title": "Keyboard shortcuts",
+    "volumeDown": "Volume down 5%",
+    "volumeUp": "Volume up 5%"
+  },
+  "tabs": {
+    "albums": "Albums",
+    "artists": "Artists",
+    "playlists": "Playlists",
+    "queue": "Queue",
+    "search": "Search",
+    "tracks": "Tracks"
+  },
+  "toast": {
+    "disconnected": "Disconnected — reconnecting…"
+  },
+  "trackPanel": {
+    "clearSelection": "Deselect",
+    "defaultTitle": "Tracks",
+    "enqueueSelected": "+ queue {{count}}",
+    "noTracks": "No tracks",
+    "playButton": "play",
+    "playTitle": "Play album now",
+    "queueAlbumTitle": "Add album to queue",
+    "queueButton": "+ queue",
+    "queueTrackTitle": "Add to queue",
+    "searchPlaceholder": "search tracks…",
+    "selectAlbum": "Select an album",
+    "selectedCount": "{{count}} selected"
+  }
+}

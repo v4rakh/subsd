@@ -1,0 +1,33 @@
+# Binary output
+bin/
+
+# Embedded frontend build output
+web/dist/
+!web/dist/placeholder
+
+# Go test/build artefacts
+*.test
+*.out
+*.prof
+vendor/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Nix
+result
+result/
+result/**
