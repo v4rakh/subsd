@@ -73,7 +73,20 @@ export default function App() {
 
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
-			if ((e.target as HTMLElement).tagName === 'INPUT') return;
+			const target = e.target as HTMLElement;
+			const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+			// ESC always blurs focused inputs so the user can get back to global shortcuts
+			if (e.key === 'Escape') {
+				if (isInput) {
+					target.blur();
+					e.preventDefault();
+				}
+				return;
+			}
+
+			if (isInput) return;
+
 			if (e.code === 'Space') {
 				e.preventDefault();
 				controls.playPause();
@@ -235,7 +248,7 @@ export default function App() {
 					<button
 						key={tab.id}
 						className={cn(
-							'flex-1 flex items-center justify-center py-4 text-xs font-[family-name:var(--font-ui)] font-semibold tracking-widest uppercase transition-colors',
+							'flex-1 flex items-center justify-center py-4 text-[0.65rem] font-semibold tracking-widest uppercase transition-colors',
 							mobileTab === tab.id ? 'text-brand' : 'text-dim'
 						)}
 						onClick={() => setMobileTab(tab.id)}>

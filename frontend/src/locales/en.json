@@ -4,13 +4,13 @@
     "enqueueTitle": "Add album to queue",
     "noAlbums": "No albums",
     "playTitle": "Play album now",
-    "searchPlaceholder": "search albums…",
+    "searchPlaceholder": "filter albums…",
     "selectArtist": "Select an artist"
   },
   "artistPanel": {
     "albums": "albums",
     "empty": "No artists",
-    "searchPlaceholder": "search…",
+    "searchPlaceholder": "filter…",
     "title": "Artists"
   },
   "connecting": "Connecting…",
@@ -53,7 +53,7 @@
     "clearTitle": "Clear queue",
     "empty": "Queue is empty",
     "removeTitle": "Remove from queue",
-    "searchPlaceholder": "search queue…",
+    "searchPlaceholder": "filter queue…",
     "title": "Queue"
   },
   "searchPanel": {
@@ -66,6 +66,7 @@
     "nextTrack": "Next track",
     "playPause": "Play / Pause",
     "prevTrack": "Previous track",
+    "blurInput": "Unfocus input",
     "search": "Search",
     "showShortcuts": "Show shortcuts",
     "title": "Keyboard shortcuts",
@@ -93,7 +94,7 @@
     "queueAlbumTitle": "Add album to queue",
     "queueButton": "+ queue",
     "queueTrackTitle": "Add to queue",
-    "searchPlaceholder": "search tracks…",
+    "searchPlaceholder": "filter tracks…",
     "selectAlbum": "Select an album",
     "selectedCount": "{{count}} selected"
   }

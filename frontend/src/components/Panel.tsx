@@ -20,7 +20,7 @@ interface PanelHeaderProps {
 }
 export function PanelHeader({ title, children, backLabel, onBack }: PanelHeaderProps) {
 	return (
-		<div className="flex items-center justify-between gap-2 px-6 h-16 bg-bg1 border-b border-border shrink-0">
+		<div className="flex items-center justify-between gap-2 px-4 h-10 border-b border-border shrink-0">
 			<div className="flex items-center gap-2 min-w-0">
 				{onBack && backLabel && (
 					<button

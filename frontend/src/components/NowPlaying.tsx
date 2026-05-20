@@ -204,12 +204,12 @@ export function NowPlaying({ playerState, controls, connected, theme, onThemeTog
 							<Repeat2 className="size-4" />
 						</Button>
 					</div>
-					<div className="flex items-center gap-2 w-72 xl:w-[30rem]">
+					<div className="flex items-center gap-2 w-80 xl:w-[34rem]">
 						<span className="text-xs text-dim w-8 text-right tabular-nums shrink-0">
 							{fmtDuration(position)}
 						</span>
 						<Slider
-							className="flex-1"
+							className="flex-1 [&_[data-slot=slider-track]]:h-2"
 							min={0}
 							max={duration > 0 ? duration : 1}
 							step={1}
@@ -219,7 +219,7 @@ export function NowPlaying({ playerState, controls, connected, theme, onThemeTog
 						/>
 						<span className="text-xs text-dim w-8 tabular-nums shrink-0">{fmtDuration(duration)}</span>
 					</div>
-					<div className="flex items-center gap-2 w-72 xl:w-[30rem]">
+					<div className="flex items-center gap-2 w-44 xl:w-64">
 						<Volume2 className="size-3.5 text-dim shrink-0" />
 						<Slider
 							key={`vol-desktop-${isDesktop}`}
@@ -336,7 +336,7 @@ export function NowPlaying({ playerState, controls, connected, theme, onThemeTog
 			<div className="flex lg:hidden items-center gap-2 px-6 pb-5 pl-2! pr-2!">
 				<span className="text-xs text-dim w-8 text-right tabular-nums shrink-0">{fmtDuration(position)}</span>
 				<Slider
-					className="flex-1"
+					className="flex-1 [&_[data-slot=slider-track]]:h-2"
 					min={0}
 					max={duration > 0 ? duration : 1}
 					step={1}

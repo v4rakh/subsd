@@ -24,8 +24,10 @@ function ArtistRow({ artist, onSelect }: { artist: Artist; onSelect: (a: Artist)
 	const { t } = useTranslation();
 	return (
 		<div
-			className="group flex items-center gap-3 px-6 py-3 cursor-pointer hover:bg-bg2 transition-colors select-none"
-			onClick={() => onSelect(artist)}>
+			className="group flex items-center gap-3 px-6 py-3 cursor-pointer hover:bg-bg2 focus:bg-bg2 focus:outline-none transition-colors select-none"
+			tabIndex={0}
+			onClick={() => onSelect(artist)}
+			onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect(artist)}>
 			{artist.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
@@ -65,8 +67,10 @@ function AlbumRow({
 	const { t } = useTranslation();
 	return (
 		<div
-			className="group flex items-center gap-3 px-6 py-3 cursor-pointer hover:bg-bg2 transition-colors select-none"
-			onClick={() => onSelect(album)}>
+			className="group flex items-center gap-3 px-6 py-3 cursor-pointer hover:bg-bg2 focus:bg-bg2 focus:outline-none transition-colors select-none"
+			tabIndex={0}
+			onClick={() => onSelect(album)}
+			onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect(album)}>
 			{album.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
@@ -121,8 +125,10 @@ function SongRow({
 	const { t } = useTranslation();
 	return (
 		<div
-			className="group flex items-center gap-3 px-6 py-3 cursor-pointer hover:bg-bg2 transition-colors select-none"
-			onClick={() => onEnqueue(song.id)}>
+			className="group flex items-center gap-3 px-6 py-3 cursor-pointer hover:bg-bg2 focus:bg-bg2 focus:outline-none transition-colors select-none"
+			tabIndex={0}
+			onClick={() => onEnqueue(song.id)}
+			onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onEnqueue(song.id)}>
 			<div className="min-w-0 flex-1">
 				<div className="truncate">{song.title}</div>
 				<div className="truncate text-dim text-xs mt-0.5">

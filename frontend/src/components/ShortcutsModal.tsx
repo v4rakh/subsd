@@ -15,8 +15,9 @@ export function ShortcutsModal({ open, onClose }: Props) {
 		['←', t('shortcuts.prevTrack')],
 		['[', t('shortcuts.volumeDown')],
 		[']', t('shortcuts.volumeUp')],
-		['?', t('shortcuts.showShortcuts')],
-		['/', t('shortcuts.search')]
+		['/', t('shortcuts.search')],
+		['Esc', t('shortcuts.blurInput')],
+		['?', t('shortcuts.showShortcuts')]
 	];
 
 	return (
