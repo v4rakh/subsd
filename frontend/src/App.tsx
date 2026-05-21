@@ -9,6 +9,7 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { TrackPanel } from './components/TrackPanel';
 import { Dialog, DialogContent } from './components/ui/dialog';
 import { Toaster } from './components/ui/sonner';
+import { apiFetch } from './api';
 import { useLibrary } from './hooks/useLibrary';
 import { usePlayer } from './hooks/usePlayer';
 import { useTheme } from './hooks/useTheme';
@@ -240,6 +241,7 @@ export default function App() {
 					if (window.innerWidth >= 1024) setShowSearch(true);
 					else setMobileTab('search');
 				}}
+				onRefreshCache={() => apiFetch('/api/cache', { method: 'POST' }).catch(() => {})}
 			/>
 
 			{/* Mobile tab bar */}

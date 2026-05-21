@@ -20,7 +20,8 @@ import {
 	SearchIcon,
 	Headphones,
 	Check,
-	Radio
+	Radio,
+	RefreshCw
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +44,7 @@ interface Props {
 	theme: Theme;
 	onThemeToggle: () => void;
 	onOpenSearch: () => void;
+	onRefreshCache: () => void;
 }
 
 function TrackInfo({ track }: { track: Track | null }) {
@@ -145,7 +147,15 @@ function AudioDevicePopover({
 	);
 }
 
-export function NowPlaying({ playerState, controls, connected, theme, onThemeToggle, onOpenSearch }: Props) {
+export function NowPlaying({
+	playerState,
+	controls,
+	connected,
+	theme,
+	onThemeToggle,
+	onOpenSearch,
+	onRefreshCache
+}: Props) {
 	const { t } = useTranslation();
 	const { playing, currentIdx, queue, position, duration, volume, shuffle, repeat, lastScrobble } = playerState;
 	const track = queue[currentIdx] ?? null;
@@ -244,6 +254,14 @@ export function NowPlaying({ playerState, controls, connected, theme, onThemeTog
 						variant="ghost"
 						size="icon-sm"
 						className="text-dim shrink-0"
+						onClick={onRefreshCache}
+						title={t('nowPlaying.refreshLibrary')}>
+						<RefreshCw className="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="text-dim shrink-0"
 						onClick={onOpenSearch}
 						title={t('searchPanel.title')}>
 						<SearchIcon className="size-4" />
@@ -268,6 +286,14 @@ export function NowPlaying({ playerState, controls, connected, theme, onThemeTog
 					{devices.length > 0 && (
 						<AudioDevicePopover devices={devices} current={current} setDevice={setDevice} />
 					)}
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="text-dim"
+						onClick={onRefreshCache}
+						title={t('nowPlaying.refreshLibrary')}>
+						<RefreshCw className="size-4" />
+					</Button>
 					<Button
 						variant="ghost"
 						size="icon-sm"

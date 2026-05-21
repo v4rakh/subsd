@@ -82,11 +82,14 @@ type coverArtEntry struct {
 const (
 	libraryCacheTTL  = 5 * time.Minute
 	coverArtCacheTTL = 24 * time.Hour
+	songsCacheTTL    = 24 * time.Hour
 
 	// artistsKey is the singleton cache key for the full artists list.
 	artistsKey = "artists"
 	// playlistsKey is the singleton cache key for the full playlists list.
 	playlistsKey = "playlists"
+	// songsKey is the singleton cache key for the full songs list built during warm.
+	songsKey = "songs"
 )
 
 // wsClient wraps a WebSocket connection with its own write mutex.
@@ -137,15 +140,16 @@ func (m Mode) ServesFrontend() bool { return m == ModeFull || m == ModeFrontend 
 
 // Config holds the server's listen address and optional security settings.
 type Config struct {
-	Mode           Mode // operating mode; zero value is ModeFull
-	Addr           string
-	Token          string        // if non-empty, require cookie auth
-	TLSCert        string        // path to TLS certificate file
-	TLSKey         string        // path to TLS private key file
-	ReadTimeout    time.Duration // HTTP server read timeout
-	URL            string        // returned in /config.json; used by frontend in UI-only mode
-	CORSOrigins    string        // comma-separated allowed origins; empty = CORS disabled
-	CookieSameSite http.SameSite // SameSite policy for the session cookie; zero defaults to Strict
+	Mode                 Mode // operating mode; zero value is ModeFull
+	Addr                 string
+	Token                string        // if non-empty, require cookie auth
+	TLSCert              string        // path to TLS certificate file
+	TLSKey               string        // path to TLS private key file
+	ReadTimeout          time.Duration // HTTP server read timeout
+	URL                  string        // returned in /config.json; used by frontend in UI-only mode
+	CORSOrigins          string        // comma-separated allowed origins; empty = CORS disabled
+	CookieSameSite       http.SameSite // SameSite policy for the session cookie; zero defaults to Strict
+	CacheRefreshInterval time.Duration // how often the background task re-warms the library cache; 0 disables periodic refresh
 }
 
 // Server wires the Subsonic client, player, and WebSocket hub together.
@@ -170,8 +174,13 @@ type Server struct {
 	coverArt  cache.Cache[coverArtKey, coverArtEntry]
 	playlists cache.Cache[string, []subsonic.Playlist]
 	playlist  cache.Cache[string, *subsonic.Playlist]
+	songs     cache.Cache[string, []subsonic.Song]
 
 	sf singleflight.Group // deduplicates concurrent in-flight Subsonic fetches
+
+	refreshInterval time.Duration
+	refreshTrigger  chan struct{} // buffered(1); send to request an immediate warm
+	refreshCancel   context.CancelFunc
 
 	httpSrv *http.Server
 	clients map[*websocket.Conn]*wsClient
@@ -190,26 +199,29 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS) 
 		cookieSameSite = http.SameSiteStrictMode
 	}
 	s := &Server{
-		client:         client,
-		httpClient:     &http.Client{Timeout: 15 * time.Second},
-		player:         p,
-		mode:           cfg.Mode,
-		addr:           cfg.Addr,
-		token:          cfg.Token,
-		tlsCert:        cfg.TLSCert,
-		tlsKey:         cfg.TLSKey,
-		readTimeout:    cfg.ReadTimeout,
-		staticFS:       staticFS,
-		url:            cfg.URL,
-		corsOrigins:    cfg.CORSOrigins,
-		cookieSameSite: cookieSameSite,
-		artists:        cache.NewTTL[string, []subsonic.Artist](libraryCacheTTL),
-		artist:         cache.NewTTL[string, *subsonic.Artist](libraryCacheTTL),
-		album:          cache.NewTTL[string, *subsonic.Album](libraryCacheTTL),
-		coverArt:       cache.NewTTL[coverArtKey, coverArtEntry](coverArtCacheTTL),
-		playlists:      cache.NewTTL[string, []subsonic.Playlist](libraryCacheTTL),
-		playlist:       cache.NewTTL[string, *subsonic.Playlist](libraryCacheTTL),
-		clients:        make(map[*websocket.Conn]*wsClient),
+		client:          client,
+		httpClient:      &http.Client{Timeout: 15 * time.Second},
+		player:          p,
+		mode:            cfg.Mode,
+		addr:            cfg.Addr,
+		token:           cfg.Token,
+		tlsCert:         cfg.TLSCert,
+		tlsKey:          cfg.TLSKey,
+		readTimeout:     cfg.ReadTimeout,
+		staticFS:        staticFS,
+		url:             cfg.URL,
+		corsOrigins:     cfg.CORSOrigins,
+		cookieSameSite:  cookieSameSite,
+		artists:         cache.NewTTL[string, []subsonic.Artist](libraryCacheTTL),
+		artist:          cache.NewTTL[string, *subsonic.Artist](libraryCacheTTL),
+		album:           cache.NewTTL[string, *subsonic.Album](libraryCacheTTL),
+		coverArt:        cache.NewTTL[coverArtKey, coverArtEntry](coverArtCacheTTL),
+		playlists:       cache.NewTTL[string, []subsonic.Playlist](libraryCacheTTL),
+		playlist:        cache.NewTTL[string, *subsonic.Playlist](libraryCacheTTL),
+		songs:           cache.NewTTL[string, []subsonic.Song](songsCacheTTL),
+		refreshInterval: cfg.CacheRefreshInterval,
+		refreshTrigger:  make(chan struct{}, 1),
+		clients:         make(map[*websocket.Conn]*wsClient),
 	}
 	if p != nil {
 		p.OnChange(func(state player.State) {
@@ -289,6 +301,7 @@ func (s *Server) Handler() http.Handler {
 
 		// ── Cache ─────────────────────────────────────────────────────────
 		r.Delete("/api/cache", s.handleClearCache)
+		r.Post("/api/cache", s.handleRefreshCache)
 
 		// ── State snapshot ────────────────────────────────────────────────
 		r.Get("/api/state", s.handleState)
@@ -314,6 +327,14 @@ func (s *Server) Start() error {
 	s.httpSrv = &http.Server{Addr: s.addr, Handler: h, ReadTimeout: s.readTimeout}
 	s.mu.Unlock()
 
+	if s.mode.ServesAPI() && s.client != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		s.mu.Lock()
+		s.refreshCancel = cancel
+		s.mu.Unlock()
+		go s.backgroundRefresh(ctx)
+	}
+
 	log.Info().Str("addr", s.addr).Msg("server: listening")
 	if s.tlsCert != "" && s.tlsKey != "" {
 		if err := s.httpSrv.ListenAndServeTLS(s.tlsCert, s.tlsKey); err != http.ErrServerClosed {
@@ -332,7 +353,11 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	srv := s.httpSrv
+	cancel := s.refreshCancel
 	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 	if srv == nil {
 		return nil
 	}
@@ -561,6 +586,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		s.errorf(w, http.StatusBadRequest, "missing query parameter")
 		return
 	}
+	// Use local full-library search when the songs cache is warm.
+	if _, ok := s.songs.Get(songsKey); ok {
+		s.json(w, s.localSearch(q))
+		return
+	}
+	// Fall back to Subsonic search2 (limited result counts) while cache is cold.
 	result, err := s.client.Search(r.Context(), q)
 	if err != nil {
 		s.errorf(w, http.StatusBadGateway, "%v", err)
@@ -690,8 +721,8 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 	s.ok(w)
 }
 
-// handleClearCache evicts all entries from every in-memory cache so the next
-// request re-fetches fresh data from the Subsonic server.
+// handleClearCache evicts all entries from every in-memory cache (including
+// cover art) and immediately triggers a background library refresh.
 func (s *Server) handleClearCache(w http.ResponseWriter, _ *http.Request) {
 	s.artists.Clear()
 	s.artist.Clear()
@@ -699,8 +730,184 @@ func (s *Server) handleClearCache(w http.ResponseWriter, _ *http.Request) {
 	s.coverArt.Clear()
 	s.playlists.Clear()
 	s.playlist.Clear()
-	log.Info().Msg("server: cache cleared")
+	s.songs.Clear()
+	s.triggerRefresh()
+	log.Info().Msg("server: cache cleared, refresh triggered")
 	s.ok(w)
+}
+
+// handleRefreshCache clears the library caches and triggers a background
+// re-warm without wiping the cover art cache.
+func (s *Server) handleRefreshCache(w http.ResponseWriter, _ *http.Request) {
+	s.artists.Clear()
+	s.artist.Clear()
+	s.album.Clear()
+	s.playlists.Clear()
+	s.playlist.Clear()
+	s.songs.Clear()
+	s.triggerRefresh()
+	log.Info().Msg("server: library refresh triggered")
+	s.ok(w)
+}
+
+// ── Background cache warm ──────────────────────────────────────────────────────
+
+// triggerRefresh sends a non-blocking signal to the background goroutine to
+// perform an immediate warm. If a signal is already pending, this is a no-op.
+func (s *Server) triggerRefresh() {
+	select {
+	case s.refreshTrigger <- struct{}{}:
+	default:
+	}
+}
+
+// backgroundRefresh runs an initial warm on startup and then re-warms on every
+// tick or when triggered manually via triggerRefresh.
+func (s *Server) backgroundRefresh(ctx context.Context) {
+	log.Info().Msg("cache: starting initial library warm")
+	s.warmCache(ctx)
+
+	if s.refreshInterval <= 0 {
+		// No periodic refresh; only respond to manual triggers.
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-s.refreshTrigger:
+				log.Info().Msg("cache: manual refresh triggered")
+				s.warmCache(ctx)
+			}
+		}
+	}
+
+	ticker := time.NewTicker(s.refreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			log.Info().Dur("interval", s.refreshInterval).Msg("cache: scheduled refresh")
+			s.warmCache(ctx)
+		case <-s.refreshTrigger:
+			log.Info().Msg("cache: manual refresh triggered")
+			s.warmCache(ctx)
+		}
+	}
+}
+
+// warmCache performs a deep scan of the Subsonic library: all artists → all
+// artist details (albums) → all album details (songs). Results are stored in
+// the in-memory caches so that subsequent requests and local search are fast.
+// The operation is best-effort: per-artist and per-album errors are logged and
+// skipped so a partial failure doesn't discard already-fetched data.
+func (s *Server) warmCache(ctx context.Context) {
+	start := time.Now()
+
+	artists, err := s.client.GetArtists(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("cache: warm aborted — GetArtists failed")
+		return
+	}
+	s.artists.Set(artistsKey, artists)
+
+	var allSongs []subsonic.Song
+	for _, a := range artists {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		artist, err := s.client.GetArtist(ctx, a.ID)
+		if err != nil {
+			log.Error().Err(err).Str("artist", a.Name).Msg("cache: warm — GetArtist failed, skipping")
+			continue
+		}
+		s.artist.Set(a.ID, artist)
+
+		for _, alb := range artist.Albums {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			album, err := s.client.GetAlbum(ctx, alb.ID)
+			if err != nil {
+				log.Error().Err(err).Str("album", alb.Name).Msg("cache: warm — GetAlbum failed, skipping")
+				continue
+			}
+			s.album.Set(alb.ID, album)
+			allSongs = append(allSongs, album.Songs...)
+		}
+	}
+	s.songs.Set(songsKey, allSongs)
+
+	playlists, err := s.client.GetPlaylists(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("cache: warm — GetPlaylists failed")
+	} else {
+		s.playlists.Set(playlistsKey, playlists)
+	}
+
+	log.Info().
+		Dur("dur", time.Since(start)).
+		Int("artists", len(artists)).
+		Int("songs", len(allSongs)).
+		Msg("cache: library warm complete")
+}
+
+// localSearch searches the cached songs and artists lists for the given query
+// string (case-insensitive substring match). Albums are derived from matching
+// songs and the per-album cache so all fields are populated where available.
+func (s *Server) localSearch(q string) *subsonic.SearchResult {
+	lq := strings.ToLower(q)
+	allSongs, _ := s.songs.Get(songsKey)
+
+	var matchedSongs []subsonic.Song
+	albumsSeen := make(map[string]bool)
+	var matchedAlbums []subsonic.Album
+
+	for _, song := range allSongs {
+		titleMatch := strings.Contains(strings.ToLower(song.Title), lq)
+		artistMatch := strings.Contains(strings.ToLower(song.Artist), lq)
+		albumMatch := strings.Contains(strings.ToLower(song.Album), lq)
+
+		if titleMatch || artistMatch || albumMatch {
+			matchedSongs = append(matchedSongs, song)
+		}
+
+		if albumMatch && !albumsSeen[song.AlbumID] {
+			albumsSeen[song.AlbumID] = true
+			if album, ok := s.album.Get(song.AlbumID); ok {
+				matchedAlbums = append(matchedAlbums, *album)
+			} else {
+				matchedAlbums = append(matchedAlbums, subsonic.Album{
+					ID:       song.AlbumID,
+					Name:     song.Album,
+					Artist:   song.Artist,
+					ArtistID: song.ArtistID,
+					CoverArt: song.CoverArt,
+				})
+			}
+		}
+	}
+
+	var matchedArtists []subsonic.Artist
+	if artists, ok := s.artists.Get(artistsKey); ok {
+		for _, a := range artists {
+			if strings.Contains(strings.ToLower(a.Name), lq) {
+				matchedArtists = append(matchedArtists, a)
+			}
+		}
+	}
+
+	return &subsonic.SearchResult{
+		Artists: matchedArtists,
+		Albums:  matchedAlbums,
+		Songs:   matchedSongs,
+	}
 }
 
 // ── Cache helpers ──────────────────────────────────────────────────────────────

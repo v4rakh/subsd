@@ -127,6 +127,12 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Usage:   "SameSite policy for the session cookie (strict, lax, none); use none for cross-origin daemon/frontend split — requires HTTPS (browsers reject none without Secure)",
 		Sources: cli.EnvVars("SUBSD_COOKIE_SAMESITE"),
 	},
+	&cli.DurationFlag{
+		Name:    "cache-refresh-interval",
+		Usage:   "How often to refresh the full library cache in the background (0 disables periodic refresh, cache is still warmed once on startup)",
+		Value:   time.Hour,
+		Sources: cli.EnvVars("SUBSD_CACHE_REFRESH_INTERVAL"),
+	},
 })
 
 func main() {
@@ -165,15 +171,16 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	cfg := server.Config{
-		Mode:           mode,
-		Addr:           cmd.String("addr"),
-		Token:          token,
-		TLSCert:        cmd.String("tls-cert"),
-		TLSKey:         cmd.String("tls-key"),
-		ReadTimeout:    cmd.Duration("read-timeout"),
-		URL:            cmd.String("url"),
-		CORSOrigins:    cmd.String("cors-origins"),
-		CookieSameSite: parseSameSite(cmd.String("cookie-samesite")),
+		Mode:                 mode,
+		Addr:                 cmd.String("addr"),
+		Token:                token,
+		TLSCert:              cmd.String("tls-cert"),
+		TLSKey:               cmd.String("tls-key"),
+		ReadTimeout:          cmd.Duration("read-timeout"),
+		URL:                  cmd.String("url"),
+		CORSOrigins:          cmd.String("cors-origins"),
+		CookieSameSite:       parseSameSite(cmd.String("cookie-samesite")),
+		CacheRefreshInterval: cmd.Duration("cache-refresh-interval"),
 	}
 
 	var (

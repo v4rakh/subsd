@@ -195,7 +195,7 @@ export function SearchPanel({
 			} finally {
 				if (!controller.signal.aborted) setLoading(false);
 			}
-		}, 280);
+		}, 500);
 		return () => {
 			if (timerRef.current) clearTimeout(timerRef.current);
 			abortRef.current?.abort();

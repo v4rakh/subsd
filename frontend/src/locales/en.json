@@ -29,6 +29,7 @@
     "pause": "Pause",
     "play": "Play",
     "previous": "Previous",
+    "refreshLibrary": "Refresh library",
     "repeat": "Repeat",
     "scrobbleError": "Last scrobble failed",
     "scrobbleOk": "Last scrobble succeeded",
