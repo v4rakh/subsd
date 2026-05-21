@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package satellite;
+
+option go_package = "varakh.de/subsd/internal/satellitepb";
+
+service SatelliteService {
+  // Bidirectional stream: satellite dials server and holds this open.
+  // Server pushes ServerMessage commands; satellite pushes SatelliteMessage state.
+  rpc Connect(stream SatelliteMessage) returns (stream ServerMessage);
+}
+
+// ── Upstream (satellite → server) ────────────────────────────────────────────
+
+message SatelliteMessage {
+  oneof payload {
+    Registration registration = 1;
+    Heartbeat    heartbeat    = 2;
+    PlayerState  state        = 3;
+    DeviceList   devices      = 4;
+    TrackEnded   track_ended  = 5;
+  }
+}
+
+message Registration {
+  string            name    = 1;
+  repeated AudioDevice devices = 2;
+}
+
+message AudioDevice {
+  string id   = 1; // mpv device string, e.g. "alsa/hw:0"
+  string name = 2; // human-readable label
+}
+
+message PlayerState {
+  Status status       = 1;
+  double position     = 2;
+  double duration     = 3;
+  string current_url  = 4;
+  int32  volume       = 5;
+  string audio_device = 6;
+}
+
+enum Status {
+  IDLE    = 0;
+  PLAYING = 1;
+  PAUSED  = 2;
+}
+
+message Heartbeat {
+  int64 timestamp_ms = 1;
+}
+
+message DeviceList {
+  repeated AudioDevice devices = 1;
+}
+
+message TrackEnded {}
+
+// ── Downstream (server → satellite) ──────────────────────────────────────────
+
+message ServerMessage {
+  oneof payload {
+    Command        command         = 1;
+    RequestDevices request_devices = 2;
+  }
+}
+
+message Command {
+  CommandType type     = 1;
+  string      url      = 2; // PLAY
+  double      position = 3; // PLAY (resume offset) / SEEK
+  int32       volume   = 4; // SET_VOLUME
+  string      device   = 5; // SET_AUDIO_DEVICE
+  // Track metadata — populated for PLAY so the satellite can log properly
+  string      id       = 6;
+  string      title    = 7;
+  string      artist   = 8;
+  string      album    = 9;
+}
+
+enum CommandType {
+  PLAY             = 0;
+  PAUSE            = 1;
+  STOP             = 2;
+  SEEK             = 3;
+  SET_VOLUME       = 4;
+  SET_AUDIO_DEVICE = 5;
+  RESUME           = 6;
+}
+
+message RequestDevices {}

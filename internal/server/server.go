@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sync/singleflight"
 	"varakh.de/subsd/internal/cache"
 	"varakh.de/subsd/internal/player"
+	"varakh.de/subsd/internal/satellite"
 	"varakh.de/subsd/internal/subsonic"
 )
 
@@ -80,9 +81,6 @@ type coverArtEntry struct {
 }
 
 const (
-	libraryCacheTTL  = 5 * time.Minute
-	coverArtCacheTTL = 24 * time.Hour
-	songsCacheTTL    = 24 * time.Hour
 
 	// artistsKey is the singleton cache key for the full artists list.
 	artistsKey = "artists"
@@ -118,7 +116,11 @@ const (
 	ModeFrontend
 )
 
-// ParseMode converts a string ("full", "daemon", "frontend", or "") to a Mode.
+// ModeSatellite is a binary that connects to a remote subsd daemon as a satellite.
+// It does not start an HTTP or gRPC server; it only dials and registers.
+const ModeSatellite Mode = 3
+
+// ParseMode converts a string ("full", "daemon", "frontend", "satellite", or "") to a Mode.
 func ParseMode(s string) (Mode, error) {
 	switch strings.ToLower(s) {
 	case "full", "":
@@ -127,8 +129,10 @@ func ParseMode(s string) (Mode, error) {
 		return ModeDaemon, nil
 	case "frontend":
 		return ModeFrontend, nil
+	case "satellite":
+		return ModeSatellite, nil
 	default:
-		return 0, fmt.Errorf("unknown mode %q: must be full, daemon, or frontend", s)
+		return 0, fmt.Errorf("unknown mode %q: must be full, daemon, frontend, or satellite", s)
 	}
 }
 
@@ -150,6 +154,8 @@ type Config struct {
 	CORSOrigins          string        // comma-separated allowed origins; empty = CORS disabled
 	CookieSameSite       http.SameSite // SameSite policy for the session cookie; zero defaults to Strict
 	CacheRefreshInterval time.Duration // how often the background task re-warms the library cache; 0 disables periodic refresh
+	LibraryCacheTTL      time.Duration // TTL for artist/album/playlist entries; 0 uses default (5m)
+	CoverArtCacheTTL     time.Duration // TTL for cover art entries; 0 uses default (24h)
 }
 
 // Server wires the Subsonic client, player, and WebSocket hub together.
@@ -157,6 +163,8 @@ type Server struct {
 	client         SubsonicClient
 	httpClient     *http.Client
 	player         PlayerController
+	satelliteCtrl  *SatelliteController // non-nil when satellite mode is active
+	registry       *satellite.Registry  // non-nil when satellite mode is active
 	mode           Mode
 	addr           string
 	token          string
@@ -193,15 +201,27 @@ var upgrader = websocket.Upgrader{
 
 // New creates a Server and registers player callbacks for state changes and
 // track completion (scrobbling). client and p may be nil when cfg.Mode is ModeFrontend.
-func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS) *Server {
+// reg may be nil; when provided, satellite management endpoints are enabled.
+func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, reg *satellite.Registry) *Server {
 	cookieSameSite := cfg.CookieSameSite
 	if cookieSameSite == 0 {
 		cookieSameSite = http.SameSiteStrictMode
 	}
+	var satCtrl *SatelliteController
+	if reg != nil {
+		if rawPlayer, ok := p.(*player.Player); ok {
+			satCtrl = NewSatelliteController(rawPlayer, reg)
+			// Replace the PlayerController with the satellite-aware wrapper.
+			p = satCtrl
+		}
+	}
+
 	s := &Server{
 		client:          client,
 		httpClient:      &http.Client{Timeout: 15 * time.Second},
 		player:          p,
+		satelliteCtrl:   satCtrl,
+		registry:        reg,
 		mode:            cfg.Mode,
 		addr:            cfg.Addr,
 		token:           cfg.Token,
@@ -212,13 +232,13 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS) 
 		url:             cfg.URL,
 		corsOrigins:     cfg.CORSOrigins,
 		cookieSameSite:  cookieSameSite,
-		artists:         cache.NewTTL[string, []subsonic.Artist](libraryCacheTTL),
-		artist:          cache.NewTTL[string, *subsonic.Artist](libraryCacheTTL),
-		album:           cache.NewTTL[string, *subsonic.Album](libraryCacheTTL),
-		coverArt:        cache.NewTTL[coverArtKey, coverArtEntry](coverArtCacheTTL),
-		playlists:       cache.NewTTL[string, []subsonic.Playlist](libraryCacheTTL),
-		playlist:        cache.NewTTL[string, *subsonic.Playlist](libraryCacheTTL),
-		songs:           cache.NewTTL[string, []subsonic.Song](songsCacheTTL),
+		artists:         cache.NewTTL[string, []subsonic.Artist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
+		artist:          cache.NewTTL[string, *subsonic.Artist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
+		album:           cache.NewTTL[string, *subsonic.Album](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
+		coverArt:        cache.NewTTL[coverArtKey, coverArtEntry](defaultDuration(cfg.CoverArtCacheTTL, 24*time.Hour)),
+		playlists:       cache.NewTTL[string, []subsonic.Playlist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
+		playlist:        cache.NewTTL[string, *subsonic.Playlist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
+		songs:           cache.NewTTL[string, []subsonic.Song](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		refreshInterval: cfg.CacheRefreshInterval,
 		refreshTrigger:  make(chan struct{}, 1),
 		clients:         make(map[*websocket.Conn]*wsClient),
@@ -236,6 +256,19 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS) 
 				p.SetLastScrobble("ok")
 			}
 		})
+	}
+	if reg != nil {
+		reg.OnSatelliteListChange(func(list []satellite.Info) {
+			if satCtrl != nil {
+				satCtrl.SyncBackend()
+			}
+			s.broadcastSatellites(list)
+		})
+		if satCtrl != nil {
+			satCtrl.OnActiveDisconnect(func(name string) {
+				s.broadcastSatelliteDisconnected(name)
+			})
+		}
 	}
 	return s
 }
@@ -298,6 +331,14 @@ func (s *Server) Handler() http.Handler {
 		// ── Audio devices ─────────────────────────────────────────────────
 		r.Get("/api/devices", s.handleDevices)
 		r.Post("/api/device", s.handleDevice)
+
+		// ── Satellites ────────────────────────────────────────────────────
+		if s.registry != nil {
+			r.Get("/api/satellites", s.handleSatellites)
+			r.Post("/api/satellites/active", s.handleSatelliteSetActive)
+			r.Post("/api/satellites/{name}/device", s.handleSatelliteSetDevice)
+			r.Post("/api/satellites/{name}/devices/refresh", s.handleSatelliteRefreshDevices)
+		}
 
 		// ── Cache ─────────────────────────────────────────────────────────
 		r.Delete("/api/cache", s.handleClearCache)
@@ -393,6 +434,16 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Also send initial satellite list if available.
+	if s.registry != nil {
+		msg := struct {
+			Type       string           `json:"type"`
+			Satellites []satellite.Info `json:"satellites"`
+		}{Type: "satellites", Satellites: s.registry.List()}
+		if data, err := json.Marshal(msg); err == nil {
+			wc.send(data) //nolint:errcheck,gosec
+		}
+	}
 
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
@@ -409,6 +460,32 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) broadcast(state player.State) {
 	data, _ := json.Marshal(state)
+	s.broadcastRaw(data)
+}
+
+// broadcastSatelliteDisconnected notifies all WebSocket clients that the named
+// satellite disconnected while it was active.
+func (s *Server) broadcastSatelliteDisconnected(name string) {
+	msg := struct {
+		V    int    `json:"v"`
+		Type string `json:"type"`
+		Name string `json:"name"`
+	}{V: 1, Type: "satellite_disconnected", Name: name}
+	data, _ := json.Marshal(msg)
+	s.broadcastRaw(data)
+}
+
+// broadcastSatellites sends a satellite list update to all WebSocket clients.
+func (s *Server) broadcastSatellites(list []satellite.Info) {
+	msg := struct {
+		Type       string           `json:"type"`
+		Satellites []satellite.Info `json:"satellites"`
+	}{Type: "satellites", Satellites: list}
+	data, _ := json.Marshal(msg)
+	s.broadcastRaw(data)
+}
+
+func (s *Server) broadcastRaw(data []byte) {
 	// Snapshot clients under lock, then write without holding it so a slow
 	// or dead browser connection cannot block other broadcasts.
 	s.mu.Lock()
@@ -719,6 +796,57 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.ok(w)
+}
+
+// ── Satellites ─────────────────────────────────────────────────────────────────
+
+func (s *Server) handleSatellites(w http.ResponseWriter, _ *http.Request) {
+	s.json(w, s.registry.List())
+}
+
+func (s *Server) handleSatelliteSetActive(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if s.satelliteCtrl == nil {
+		s.errorf(w, http.StatusInternalServerError, "satellite controller not initialised")
+		return
+	}
+	if err := s.satelliteCtrl.SetActive(body.Name); err != nil {
+		s.errorf(w, http.StatusNotFound, "%v", err)
+		return
+	}
+	s.ok(w)
+}
+
+func (s *Server) handleSatelliteSetDevice(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	var body struct {
+		Device string `json:"device"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if err := s.registry.SetActiveDevice(name, body.Device); err != nil {
+		s.errorf(w, http.StatusNotFound, "%v", err)
+		return
+	}
+	s.ok(w)
+}
+
+func (s *Server) handleSatelliteRefreshDevices(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	if err := s.registry.RefreshDevices(name, 3*time.Second); err != nil {
+		s.errorf(w, http.StatusNotFound, "%v", err)
+		return
+	}
+	// Return the current device list after the refresh.
+	s.json(w, s.registry.List())
 }
 
 // handleClearCache evicts all entries from every in-memory cache (including
@@ -1091,6 +1219,14 @@ func (s *Server) errorf(w http.ResponseWriter, status int, format string, args .
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf(format, args...)}) //nolint:errcheck,gosec
+}
+
+// defaultDuration returns d if non-zero, otherwise fallback.
+func defaultDuration(d, fallback time.Duration) time.Duration {
+	if d > 0 {
+		return d
+	}
+	return fallback
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────────────

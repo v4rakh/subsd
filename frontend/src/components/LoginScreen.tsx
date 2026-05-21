@@ -1,6 +1,6 @@
+import { getApiUrl } from '../config';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getApiUrl } from '../config';
 
 interface Props {
 	onSuccess: () => void;

@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from './useWebSocket';
-import type { PlayerState } from '../types';
+import type { PlayerState, SatelliteInfo, WsMessage } from '../types';
 import { apiFetch } from '../api';
+import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULT_STATE: PlayerState = {
 	playing: false,
@@ -42,12 +44,30 @@ export interface PlayerControls {
 	enqueuePlaylist: (id: string) => void;
 }
 
-export function usePlayer(): { playerState: PlayerState; controls: PlayerControls; connected: boolean } {
+export function usePlayer(): {
+	playerState: PlayerState;
+	controls: PlayerControls;
+	connected: boolean;
+	satellites: SatelliteInfo[];
+} {
+	const { t } = useTranslation();
 	const [playerState, setPlayerState] = useState<PlayerState>(DEFAULT_STATE);
+	const [satellites, setSatellites] = useState<SatelliteInfo[]>([]);
 	const seekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const connected = useWebSocket<PlayerState>(
-		useCallback((data) => setPlayerState({ ...data, queue: data.queue ?? [] }), [])
+	const connected = useWebSocket<WsMessage>(
+		useCallback(
+			(msg) => {
+				if (msg.type === 'satellites') {
+					setSatellites(msg.satellites ?? []);
+				} else if (msg.type === 'satellite_disconnected') {
+					toast.warning(t('toast.satelliteDisconnected', { name: msg.name }));
+				} else {
+					setPlayerState({ ...msg, queue: msg.queue ?? [] });
+				}
+			},
+			[t]
+		)
 	);
 
 	const controls = useMemo<PlayerControls>(
@@ -76,5 +96,5 @@ export function usePlayer(): { playerState: PlayerState; controls: PlayerControl
 		[]
 	);
 
-	return { playerState, controls, connected };
+	return { playerState, controls, connected, satellites };
 }

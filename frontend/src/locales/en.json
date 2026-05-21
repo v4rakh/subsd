@@ -20,17 +20,20 @@
     "wrongToken": "Wrong token."
   },
   "nowPlaying": {
+    "activeSatellite": "Active satellite",
     "audioDevice": "Audio output device",
     "connected": "Connected to server",
     "darkMode": "Dark mode",
     "disconnected": "Disconnected — reconnecting…",
     "lightMode": "Light mode",
     "next": "Next",
+    "noActiveSatellite": "No active satellite — select one to enable playback",
     "pause": "Pause",
     "play": "Play",
     "previous": "Previous",
     "refreshLibrary": "Refresh library",
     "repeat": "Repeat",
+    "satellite": "Playback Satellite",
     "scrobbleError": "Last scrobble failed",
     "scrobbleOk": "Last scrobble succeeded",
     "seek": "Seek",
@@ -83,7 +86,8 @@
     "tracks": "Tracks"
   },
   "toast": {
-    "disconnected": "Disconnected — reconnecting…"
+    "disconnected": "Disconnected — reconnecting…",
+    "satelliteDisconnected": "Satellite \"{{name}}\" disconnected"
   },
   "trackPanel": {
     "clearSelection": "Deselect",

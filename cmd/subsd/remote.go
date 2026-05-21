@@ -62,10 +62,10 @@ func clientFromCmd(cmd *cli.Command) (*remoteCLIClient, error) {
 	token := fileCfg.Token
 
 	// Flags defined on the "remote" parent are visible from any subcommand.
-	if v := cmd.String("url"); v != "" {
+	if v := cmd.String(flagURL); v != "" {
 		serverURL = v
 	}
-	if v := cmd.String("token"); v != "" {
+	if v := cmd.String(flagToken); v != "" {
 		token = v
 	}
 
@@ -178,14 +178,14 @@ var remoteCommand = &cli.Command{
 	Usage: "Control a running subsd instance via its HTTP API",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:    "url",
+			Name:    flagURL,
 			Usage:   "Base URL of the subsd server (e.g. http://localhost:8080)",
-			Sources: cli.EnvVars("SUBSD_REMOTE_URL"),
+			Sources: cli.EnvVars(envRemoteURL),
 		},
 		&cli.StringFlag{
-			Name:    "token",
+			Name:    flagToken,
 			Usage:   "Authentication token (required when the server has token auth enabled)",
-			Sources: cli.EnvVars("SUBSD_REMOTE_TOKEN"),
+			Sources: cli.EnvVars(envRemoteToken),
 		},
 	},
 	Commands: []*cli.Command{
@@ -601,6 +601,86 @@ var remoteCommand = &cli.Command{
 					return err
 				}
 				return printPrettyJSON(data)
+			},
+		},
+		// ── Satellites ────────────────────────────────────────────────────
+		{
+			Name:  "satellites",
+			Usage: "List connected satellites",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				data, err := c.get(ctx, "/api/satellites")
+				if err != nil {
+					return err
+				}
+				return printPrettyJSON(data)
+			},
+		},
+		{
+			Name:      "satellite-use",
+			Usage:     "Switch playback to a satellite by name",
+			ArgsUsage: "<name>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				name, err := requireArg(cmd, "satellite name")
+				if err != nil {
+					return err
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				return c.post(ctx, "/api/satellites/active", map[string]string{"name": name})
+			},
+		},
+		{
+			Name:      "satellite-device",
+			Usage:     "Set the audio output device for a satellite",
+			ArgsUsage: "<satellite-name> <device-id>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				if cmd.Args().Len() != 2 {
+					return errors.New("usage: satellite-device <satellite-name> <device-id>")
+				}
+				satName := cmd.Args().Get(0)
+				device := cmd.Args().Get(1)
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				return c.post(ctx, "/api/satellites/"+satName+"/device", map[string]string{"device": device})
+			},
+		},
+		{
+			Name:      "satellite-devices",
+			Usage:     "List audio devices for a satellite",
+			ArgsUsage: "<satellite-name>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				name, err := requireArg(cmd, "satellite name")
+				if err != nil {
+					return err
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				data, err := c.get(ctx, "/api/satellites")
+				if err != nil {
+					return err
+				}
+				var all []map[string]any
+				if jsonErr := json.Unmarshal(data, &all); jsonErr != nil {
+					return printPrettyJSON(data)
+				}
+				for _, s := range all {
+					if s["name"] == name {
+						out, _ := json.MarshalIndent(s, "", "  ")
+						_, err = fmt.Println(string(out))
+						return err
+					}
+				}
+				return fmt.Errorf("satellite %q not found", name)
 			},
 		},
 		// ── Audio devices ─────────────────────────────────────────────────

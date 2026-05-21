@@ -49,17 +49,122 @@ type Track struct {
 	ChannelCount int    `json:"channelCount,omitempty"`
 }
 
+// PlaybackBackend abstracts the audio output layer used by the Player.
+// The player always routes playback commands through the active backend, which
+// is swapped when the active satellite changes. The local backend talks to mpv
+// over IPC; remote backends forward commands to a satellite via gRPC.
+type PlaybackBackend interface {
+	// IsLocal reports whether this backend drives the in-process mpv instance.
+	// The event loop uses this to suppress mpv events while a remote is active.
+	IsLocal() bool
+	// PlayURL loads and begins playing track, seeking to position after the file
+	// is loaded. position == 0 means play from the start.
+	PlayURL(t Track, position float64)
+	// Pause suspends playback without unloading the file.
+	Pause()
+	// Resume continues a paused or newly-started session. If no file is loaded
+	// (e.g. after a state restore), the implementation loads the current track.
+	Resume()
+	// Seek jumps to the absolute position in seconds.
+	Seek(seconds float64)
+	// Stop halts playback and discards the currently loaded file.
+	Stop()
+}
+
 // Player owns the mpv process, the IPC connection, and the queue.
 type Player struct {
-	mu           sync.RWMutex
-	conn         mpv.IPC // protected by connMu
-	connMu       sync.RWMutex
-	mpvCmd       *exec.Cmd
-	socketPath   string
-	state        State
-	pendingSeek  float64 // non-zero: seek to this position after the next file-loaded event
-	listeners    []func(State)
-	endListeners []func(Track)
+	mu             sync.RWMutex
+	conn           mpv.IPC // protected by connMu
+	connMu         sync.RWMutex
+	mpvCmd         *exec.Cmd
+	socketPath     string
+	state          State
+	pendingSeek    float64 // non-zero: seek to this position after the next file-loaded event
+	pendingUnpause bool    // true: unpause mpv after the next file-loaded event
+	listeners      []func(State)
+	endListeners   []func(Track)
+
+	backendMu    sync.RWMutex
+	backendVal   PlaybackBackend // current active backend; always non-nil
+	localBackend *mpvBackend     // the local mpv backend, kept for cancel()
+
+	closeCh   chan struct{} // closed by Close(); tells watchMPV not to restart
+	closeOnce sync.Once
+}
+
+// mpvBackend is the PlaybackBackend that drives the local mpv process.
+// It holds a back-reference to the Player so it can access the shared IPC and
+// queue state without duplicating fields.
+type mpvBackend struct{ p *Player }
+
+func (b *mpvBackend) IsLocal() bool { return true }
+
+// PlayURL sets pendingSeek/pendingUnpause and issues a loadfile command. The
+// file-loaded event handler will seek and unpause after mpv finishes loading.
+func (b *mpvBackend) PlayURL(t Track, position float64) {
+	b.p.mu.Lock()
+	b.p.pendingSeek = position
+	b.p.pendingUnpause = true
+	b.p.mu.Unlock()
+	if _, err := b.p.ipc().Command("loadfile", t.StreamURL, "replace"); err != nil {
+		log.Error().Err(err).Str("url", t.StreamURL).Msg("player/mpv: loadfile failed")
+	}
+}
+
+// Pause suspends mpv playback.
+func (b *mpvBackend) Pause() {
+	b.p.ipc().Set("pause", true) //nolint:errcheck,gosec
+}
+
+// Resume unpauses mpv. If no file is currently loaded (e.g. after RestoreState
+// or after CancelLocalPlayback killed the previous mpv), it calls loadfile
+// directly — without going through PlayURL — so that any pendingSeek set by
+// RestoreState is preserved for the file-loaded handler.
+func (b *mpvBackend) Resume() {
+	b.p.mu.RLock()
+	idx := b.p.state.CurrentIdx
+	var url string
+	if idx >= 0 && idx < len(b.p.state.Queue) {
+		url = b.p.state.Queue[idx].StreamURL
+	}
+	b.p.mu.RUnlock()
+
+	raw, _ := b.p.ipc().Get("path")
+	path, _ := raw.(string)
+	if path == "" {
+		if url != "" {
+			// Bypass PlayURL to keep any pendingSeek intact (e.g. from RestoreState).
+			// Set pendingUnpause so the file-loaded handler starts playback; mpv
+			// with --idle=yes stays paused after loadfile until explicitly unpaused.
+			b.p.mu.Lock()
+			b.p.pendingUnpause = true
+			b.p.mu.Unlock()
+			b.p.ipc().Command("loadfile", url, "replace") //nolint:errcheck,gosec
+		}
+		return
+	}
+	b.p.ipc().Set("pause", false) //nolint:errcheck,gosec
+}
+
+// Seek issues an absolute seek command.
+func (b *mpvBackend) Seek(seconds float64) {
+	b.p.ipc().Command("seek", seconds, "absolute") //nolint:errcheck,gosec
+}
+
+// Stop halts mpv and discards the loaded file.
+func (b *mpvBackend) Stop() {
+	b.p.ipc().Command("stop") //nolint:errcheck,gosec
+}
+
+// cancel clears pending state and stops mpv before switching to a remote backend.
+// The event-loop guards (IsLocal checks) prevent any in-flight loadfile from
+// producing local audio or advancing the queue after the backend is swapped.
+func (b *mpvBackend) cancel() {
+	b.p.mu.Lock()
+	b.p.pendingSeek = 0
+	b.p.pendingUnpause = false
+	b.p.mu.Unlock()
+	b.p.ipc().Command("stop") //nolint:errcheck,gosec
 }
 
 // New launches mpv, connects to its IPC socket, and returns a ready Player.
@@ -93,16 +198,21 @@ func New(socketPath string) (*Player, error) {
 // newWithIPC creates a Player backed by the given IPC connection without
 // launching goroutines. Used by New and by tests that inject a fake IPC.
 func newWithIPC(conn mpv.IPC, socketPath string, cmd *exec.Cmd) *Player {
-	return &Player{
+	p := &Player{
 		conn:       conn,
 		mpvCmd:     cmd,
 		socketPath: socketPath,
+		closeCh:    make(chan struct{}),
 		state: State{
 			Volume:     100,
 			CurrentIdx: -1,
 			Queue:      []Track{},
 		},
 	}
+	lb := &mpvBackend{p: p}
+	p.localBackend = lb
+	p.backendVal = lb
+	return p
 }
 
 // ipc returns the current mpv connection safely.
@@ -110,6 +220,47 @@ func (p *Player) ipc() mpv.IPC {
 	p.connMu.RLock()
 	defer p.connMu.RUnlock()
 	return p.conn
+}
+
+// SetBackend installs a backend that intercepts all playback commands. Pass nil
+// to restore the local mpv backend.
+func (p *Player) SetBackend(b PlaybackBackend) {
+	p.backendMu.Lock()
+	if b == nil {
+		p.backendVal = p.localBackend
+	} else {
+		p.backendVal = b
+	}
+	p.backendMu.Unlock()
+}
+
+func (p *Player) backend() PlaybackBackend {
+	p.backendMu.RLock()
+	defer p.backendMu.RUnlock()
+	return p.backendVal
+}
+
+// CancelLocalPlayback stops local mpv and clears any pending seek. Call this
+// before switching to a remote backend to prevent an in-flight loadfile from
+// completing after the backend is swapped and producing unexpected local audio.
+func (p *Player) CancelLocalPlayback() {
+	p.localBackend.cancel()
+}
+
+// InjectRemoteState updates the player's playing/position/duration/volume fields
+// from an external satellite state report and notifies all listeners. Called by
+// the satellite controller when the active satellite is remote.
+// volume == 0 means the remote did not report a volume; the field is left unchanged.
+func (p *Player) InjectRemoteState(playing bool, position, duration float64, volume int) {
+	p.mu.Lock()
+	p.state.Playing = playing
+	p.state.Position = position
+	p.state.Duration = duration
+	if volume > 0 {
+		p.state.Volume = volume
+	}
+	p.mu.Unlock()
+	p.notify()
 }
 
 // OnChange registers fn to be called in a goroutine on every state change.
@@ -159,8 +310,19 @@ func (p *Player) RestoreState(tracks []Track, currentIdx, volume int, shuffle, r
 	p.notify()
 }
 
+// ResumeCurrent loads the track at currentIdx and plays from position. Used
+// when switching back from a remote satellite: the queue index may have advanced
+// while the remote was active, so we always reload from currentIdx.
+func (p *Player) ResumeCurrent(position float64) {
+	p.mu.RLock()
+	idx := p.state.CurrentIdx
+	p.mu.RUnlock()
+	p.playAt(idx, position)
+}
+
 // Close stops mpv and removes the socket file.
 func (p *Player) Close() {
+	p.closeOnce.Do(func() { close(p.closeCh) })
 	p.ipc().Close()
 	p.mu.Lock()
 	if p.mpvCmd != nil {
@@ -169,7 +331,7 @@ func (p *Player) Close() {
 		}
 	}
 	p.mu.Unlock()
-	if err := os.Remove(p.socketPath); err != nil {
+	if err := os.Remove(p.socketPath); err != nil && !os.IsNotExist(err) {
 		log.Warn().Err(err).Msg("player: remove socket on close")
 	}
 }
@@ -183,7 +345,18 @@ func (p *Player) SetQueue(tracks []Track, startIdx int) {
 	p.state.Queue = tracks
 	p.state.CurrentIdx = startIdx
 	p.mu.Unlock()
-	p.playAt(startIdx)
+	p.playAt(startIdx, 0)
+}
+
+// SetQueueFrom replaces the queue, starts playing at startIdx, and seeks to
+// position after load. position == 0 means start from the beginning.
+func (p *Player) SetQueueFrom(tracks []Track, startIdx int, position float64) {
+	log.Info().Int("tracks", len(tracks)).Int("startIdx", startIdx).Float64("pos", position).Msg("player: queue set with position")
+	p.mu.Lock()
+	p.state.Queue = tracks
+	p.state.CurrentIdx = startIdx
+	p.mu.Unlock()
+	p.playAt(startIdx, position)
 }
 
 // AddToQueue appends a track; starts playback if the queue was previously empty.
@@ -199,7 +372,7 @@ func (p *Player) AddToQueue(t Track) {
 	p.mu.Unlock()
 
 	if startNow {
-		p.playAt(idx)
+		p.playAt(idx, 0)
 	} else {
 		p.notify()
 	}
@@ -223,7 +396,7 @@ func (p *Player) AddAllToQueue(tracks []Track) {
 	p.mu.Unlock()
 
 	if startNow {
-		p.playAt(startIdx)
+		p.playAt(startIdx, 0)
 	} else {
 		p.notify()
 	}
@@ -248,7 +421,7 @@ func (p *Player) RemoveFromQueue(idx int) {
 			p.state.CurrentIdx = len(p.state.Queue) - 1
 		}
 		p.mu.Unlock()
-		p.ipc().Command("stop") //nolint:errcheck,gosec
+		p.backend().Stop()
 		p.notify()
 		return
 	}
@@ -293,7 +466,7 @@ func (p *Player) ClearQueue() {
 	p.state.CurrentIdx = -1
 	p.state.Playing = false
 	p.mu.Unlock()
-	p.ipc().Command("stop") //nolint:errcheck,gosec
+	p.backend().Stop()
 	p.notify()
 }
 
@@ -316,31 +489,19 @@ func (p *Player) Play() {
 	if p.state.CurrentIdx < 0 && len(p.state.Queue) > 0 {
 		p.state.CurrentIdx = 0
 	}
-	idx := p.state.CurrentIdx
-	p.mu.Unlock()
-
-	// If mpv has no file loaded (e.g. after a state restore), load it now.
-	if path, _ := p.ipc().Get("path"); (path == nil || path == "") && idx >= 0 {
-		p.playAt(idx)
-		return
-	}
-
-	// Optimistic update: don't wait for the mpv "unpause" event.
-	p.mu.Lock()
 	p.state.Playing = true
 	p.mu.Unlock()
 	p.notify()
-	p.ipc().Set("pause", false) //nolint:errcheck,gosec
+	p.backend().Resume()
 }
 
 func (p *Player) Pause() {
 	log.Info().Msg("player: pause")
-	// Optimistic update: don't wait for the mpv "pause" event.
 	p.mu.Lock()
 	p.state.Playing = false
 	p.mu.Unlock()
 	p.notify()
-	p.ipc().Set("pause", true) //nolint:errcheck,gosec
+	p.backend().Pause()
 }
 
 func (p *Player) Next() {
@@ -362,7 +523,7 @@ func (p *Player) Next() {
 				p.state.Playing = false
 				p.mu.Unlock()
 				log.Info().Msg("player: next (end of queue)")
-				p.ipc().Command("stop") //nolint:errcheck,gosec
+				p.backend().Stop()
 				p.notify()
 				return
 			}
@@ -371,7 +532,27 @@ func (p *Player) Next() {
 	p.state.CurrentIdx = next
 	p.mu.Unlock()
 	log.Info().Int("idx", next).Msg("player: next")
-	p.playAt(next)
+	p.playAt(next, 0)
+}
+
+// FireTrackEndAndNext fires the end-of-track listeners for the current track
+// (e.g. scrobbling) and then advances to the next track. Used by remote
+// satellite backends where mpv's eof event never fires locally.
+func (p *Player) FireTrackEndAndNext() {
+	p.mu.RLock()
+	var completed Track
+	if p.state.CurrentIdx >= 0 && p.state.CurrentIdx < len(p.state.Queue) {
+		completed = p.state.Queue[p.state.CurrentIdx]
+	}
+	fns := p.endListeners
+	p.mu.RUnlock()
+	if completed.ID != "" {
+		log.Debug().Str("id", completed.ID).Str("title", completed.Title).Msg("player: track ended (remote eof)")
+		for _, fn := range fns {
+			go fn(completed)
+		}
+	}
+	p.Next()
 }
 
 func (p *Player) Prev() {
@@ -382,7 +563,7 @@ func (p *Player) Prev() {
 
 	if pos > 3 {
 		log.Info().Float64("pos", pos).Msg("player: prev (restart track)")
-		p.ipc().Command("seek", 0, "absolute") //nolint:errcheck,gosec
+		p.backend().Seek(0)
 		return
 	}
 	if idx > 0 {
@@ -391,13 +572,13 @@ func (p *Player) Prev() {
 		newIdx := p.state.CurrentIdx
 		p.mu.Unlock()
 		log.Info().Int("idx", newIdx).Msg("player: prev")
-		p.playAt(newIdx)
+		p.playAt(newIdx, 0)
 	}
 }
 
 func (p *Player) Seek(seconds float64) {
 	log.Debug().Float64("position", seconds).Msg("player: seek")
-	p.ipc().Command("seek", seconds, "absolute") //nolint:errcheck,gosec
+	p.backend().Seek(seconds)
 }
 
 func (p *Player) SetVolume(vol int) {
@@ -442,12 +623,14 @@ func (p *Player) JumpTo(idx int) {
 	p.state.CurrentIdx = idx
 	p.mu.Unlock()
 	log.Info().Int("idx", idx).Msg("player: jump")
-	p.playAt(idx)
+	p.playAt(idx, 0)
 }
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
-func (p *Player) playAt(idx int) {
+// playAt starts playback of the track at idx from position. position == 0
+// means start from the beginning; > 0 means seek after load.
+func (p *Player) playAt(idx int, position float64) {
 	p.mu.RLock()
 	q := p.state.Queue
 	p.mu.RUnlock()
@@ -457,11 +640,6 @@ func (p *Player) playAt(idx int) {
 	}
 
 	track := q[idx]
-	if _, err := p.ipc().Command("loadfile", track.StreamURL, "replace"); err != nil {
-		log.Error().Err(err).Str("id", track.ID).Str("title", track.Title).Msg("player: loadfile failed")
-		return
-	}
-
 	log.Info().Str("title", track.Title).Str("artist", track.Artist).Int("idx", idx).Msg("player: playing")
 
 	p.mu.Lock()
@@ -469,6 +647,7 @@ func (p *Player) playAt(idx int) {
 	p.state.Position = 0
 	p.mu.Unlock()
 	p.notify()
+	p.backend().PlayURL(track, position)
 }
 
 // eventLoop subscribes to mpv events and drives queue advancement.
@@ -494,15 +673,36 @@ func (p *Player) eventLoop() {
 func (p *Player) handleEvent(conn mpv.IPC, ev mpv.Event) {
 	switch ev.Name {
 	case "file-loaded":
+		// When a remote backend is active, ignore file-loaded from local mpv.
+		// An in-flight loadfile must not seek or restart local audio while
+		// the remote backend is playing.
+		if !p.backend().IsLocal() {
+			return
+		}
 		p.mu.Lock()
 		seek := p.pendingSeek
 		p.pendingSeek = 0
+		unpause := p.pendingUnpause
+		p.pendingUnpause = false
 		p.mu.Unlock()
 		if seek > 0 {
 			conn.Command("seek", seek, "absolute") //nolint:errcheck,gosec
 		}
+		// mpv with --idle=yes stays paused after loadfile. Unpause explicitly
+		// when the loadfile was issued for active playback (PlayURL or Resume).
+		// Using a dedicated flag avoids the race where mpv's own "pause" event
+		// fires before "file-loaded" and resets state.Playing to false.
+		if unpause {
+			conn.Set("pause", false) //nolint:errcheck,gosec
+		}
 
 	case "end-file":
+		// When a remote backend is active, it handles its own eof and forwards
+		// a TrackEnded message upstream. Ignore local mpv eof to prevent a
+		// spurious Next() call that would skip ahead on the remote.
+		if !p.backend().IsLocal() {
+			return
+		}
 		reason, _ := ev.Data["reason"].(string)
 		if reason == "eof" {
 			p.mu.RLock()
@@ -522,20 +722,29 @@ func (p *Player) handleEvent(conn mpv.IPC, ev mpv.Event) {
 		}
 
 	case "pause":
-		// Confirm the paused state (optimistic update may already have set it).
+		// When a remote backend is active, its state is authoritative; ignore
+		// local mpv events that result from the hot-switch pause.
+		if !p.backend().IsLocal() {
+			return
+		}
 		p.mu.Lock()
 		p.state.Playing = false
 		p.mu.Unlock()
 		p.notify()
 
 	case "unpause":
-		// Confirm the playing state.
+		if !p.backend().IsLocal() {
+			return
+		}
 		p.mu.Lock()
 		p.state.Playing = true
 		p.mu.Unlock()
 		p.notify()
 
 	case "seek":
+		if !p.backend().IsLocal() {
+			return
+		}
 		pos := conn.GetFloat("time-pos")
 		p.mu.Lock()
 		p.state.Position = pos
@@ -553,6 +762,12 @@ func (p *Player) pollPosition() {
 	for {
 		select {
 		case <-ticker.C:
+			// When a remote backend is active, position/duration come from
+			// InjectRemoteState. Skip local mpv polling to avoid overwriting
+			// the remote state with idle values (0/0).
+			if !p.backend().IsLocal() {
+				continue
+			}
 			pos := conn.GetFloat("time-pos")
 			dur := conn.GetFloat("duration")
 			p.mu.Lock()
@@ -569,11 +784,23 @@ func (p *Player) pollPosition() {
 	}
 }
 
-// watchMPV monitors the active mpv connection and restarts mpv if it dies.
+// watchMPV monitors the active mpv connection and restarts mpv if it dies
+// unexpectedly. It exits cleanly when Close() is called.
 func (p *Player) watchMPV() {
 	for {
 		conn := p.ipc()
-		<-conn.Done()
+		select {
+		case <-p.closeCh:
+			return
+		case <-conn.Done():
+		}
+
+		// Check again: the connection may have closed because Close() was called.
+		select {
+		case <-p.closeCh:
+			return
+		default:
+		}
 
 		log.Warn().Msg("player: mpv connection lost — restarting")
 
@@ -585,6 +812,13 @@ func (p *Player) watchMPV() {
 		p.notify()
 
 		time.Sleep(300 * time.Millisecond)
+
+		// One more check before restarting in case Close() raced the sleep.
+		select {
+		case <-p.closeCh:
+			return
+		default:
+		}
 
 		if err := p.restartMPV(vol); err != nil {
 			log.Error().Err(err).Msg("player: mpv restart failed")
@@ -705,7 +939,7 @@ func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
 	)
 	// Ensure mpv dies whenever the parent process exits — including crashes,
 	// panics, and SIGKILL — not only on graceful shutdown.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL, Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}

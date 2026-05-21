@@ -1,3 +1,4 @@
+import { apiFetch } from './api';
 import { AlbumPanel } from './components/AlbumPanel';
 import { ArtistPanel } from './components/ArtistPanel';
 import { NowPlaying } from './components/NowPlaying';
@@ -9,7 +10,6 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { TrackPanel } from './components/TrackPanel';
 import { Dialog, DialogContent } from './components/ui/dialog';
 import { Toaster } from './components/ui/sonner';
-import { apiFetch } from './api';
 import { useLibrary } from './hooks/useLibrary';
 import { usePlayer } from './hooks/usePlayer';
 import { useTheme } from './hooks/useTheme';
@@ -24,7 +24,7 @@ type MobileTab = 'artists' | 'albums' | 'tracks' | 'queue' | 'search' | 'playlis
 
 export default function App() {
 	const { t } = useTranslation();
-	const { playerState, controls, connected } = usePlayer();
+	const { playerState, controls, connected, satellites } = usePlayer();
 	const lib = useLibrary();
 	const { theme, toggle: toggleTheme } = useTheme();
 	const [showShortcuts, setShowShortcuts] = useState(false);
@@ -236,6 +236,7 @@ export default function App() {
 				controls={controls}
 				connected={connected}
 				theme={theme}
+				satellites={satellites}
 				onThemeToggle={toggleTheme}
 				onOpenSearch={() => {
 					if (window.innerWidth >= 1024) setShowSearch(true);

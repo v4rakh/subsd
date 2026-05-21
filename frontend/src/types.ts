@@ -79,3 +79,22 @@ export interface Playlist {
 	comment?: string;
 	entry?: Song[];
 }
+
+export interface SatelliteDevice {
+	id: string;
+	name: string;
+}
+
+export interface SatelliteInfo {
+	name: string;
+	active: boolean;
+	devices: SatelliteDevice[];
+	activeDevice: string;
+}
+
+// WebSocket message union. All messages carry a `v` version field.
+// Player state messages have no `type` field; satellite list messages carry `type: "satellites"`.
+export type WsMessage =
+	| (PlayerState & { v?: number; type?: undefined })
+	| { v?: number; type: 'satellites'; satellites: SatelliteInfo[] }
+	| { v?: number; type: 'satellite_disconnected'; name: string };

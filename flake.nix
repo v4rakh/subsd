@@ -68,7 +68,7 @@
           inherit version;
           src = ./.;
           doCheck = false;
-          vendorHash = "sha256-L9rN+IMoIz3tM/RSSRaZaadIC5q0LDLNp2kk58ak8rA=";
+          vendorHash = "sha256-caJMOPpPOfix+saH61Ka0o24FDq8QPkXWc/NdbA7CJA=";
 
           preBuild = ''
             mkdir -p web

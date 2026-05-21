@@ -1,8 +1,7 @@
-import { apiUrl } from '../api';
-import { useAudioDevice, type AudioDevice } from '../hooks/useAudioDevice';
+import { apiUrl, apiFetch } from '../api';
 import type { PlayerControls } from '../hooks/usePlayer';
 import type { Theme } from '../hooks/useTheme';
-import type { Track, PlayerState } from '../types';
+import type { Track, PlayerState, SatelliteInfo, SatelliteDevice } from '../types';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { fmtDuration, fmtAudioMeta } from '@/lib/format';
@@ -21,9 +20,10 @@ import {
 	Headphones,
 	Check,
 	Radio,
-	RefreshCw
+	RefreshCw,
+	Satellite
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 function useIsDesktop() {
@@ -42,6 +42,7 @@ interface Props {
 	controls: PlayerControls;
 	connected: boolean;
 	theme: Theme;
+	satellites: SatelliteInfo[];
 	onThemeToggle: () => void;
 	onOpenSearch: () => void;
 	onRefreshCache: () => void;
@@ -95,11 +96,13 @@ function ScrobbleDot({ lastScrobble }: { lastScrobble?: string }) {
 function AudioDevicePopover({
 	devices,
 	current,
+	activeSatelliteName,
 	setDevice
 }: {
-	devices: AudioDevice[];
+	devices: SatelliteDevice[];
 	current: string;
-	setDevice: (name: string) => void;
+	activeSatelliteName: string;
+	setDevice: (device: string) => void;
 }) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
@@ -113,6 +116,8 @@ function AudioDevicePopover({
 		document.addEventListener('mousedown', handler);
 		return () => document.removeEventListener('mousedown', handler);
 	}, [open]);
+
+	if (devices.length === 0) return null;
 
 	return (
 		<div ref={ref} className="relative shrink-0">
@@ -128,19 +133,93 @@ function AudioDevicePopover({
 				<div className="absolute bottom-full right-0 mb-2 min-w-[200px] max-w-[280px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
 					{devices.map((d) => (
 						<button
-							key={d.name}
+							key={d.id}
 							className={cn(
 								'w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-bg2 transition-colors',
-								current === d.name ? 'text-brand' : 'text-text'
+								current === d.id ? 'text-brand' : 'text-text'
 							)}
 							onClick={() => {
-								setDevice(d.name);
+								apiFetch(`/api/satellites/${encodeURIComponent(activeSatelliteName)}/device`, {
+									method: 'POST',
+									headers: { 'Content-Type': 'application/json' },
+									body: JSON.stringify({ device: d.id })
+								}).catch(() => {});
+								setDevice(d.id);
 								setOpen(false);
 							}}>
-							<span className="flex-1 truncate">{d.description || d.name}</span>
-							{current === d.name && <Check className="size-3.5 shrink-0" />}
+							<span className="flex-1 truncate">{d.name || d.id}</span>
+							{current === d.id && <Check className="size-3.5 shrink-0" />}
 						</button>
 					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function SatellitePopover({
+	satellites,
+	noActiveSatellite,
+	onSelect
+}: {
+	satellites: SatelliteInfo[];
+	noActiveSatellite: boolean;
+	onSelect: (name: string) => void;
+}) {
+	const { t } = useTranslation();
+	const [open, setOpen] = useState(false);
+	const ref = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!open) return;
+		const handler = (e: MouseEvent) => {
+			if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+		};
+		document.addEventListener('mousedown', handler);
+		return () => document.removeEventListener('mousedown', handler);
+	}, [open]);
+
+	if (satellites.length === 0) return null;
+
+	const active = satellites.find((s) => s.active);
+
+	return (
+		<div ref={ref} className="relative shrink-0">
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				className={cn('text-dim', open && 'text-brand bg-muted', noActiveSatellite && 'text-yellow-500')}
+				onClick={() => setOpen((o) => !o)}
+				title={noActiveSatellite ? t('nowPlaying.noActiveSatellite') : t('nowPlaying.satellite')}>
+				<Satellite className="size-4" />
+			</Button>
+			{open && (
+				<div className="absolute bottom-full right-0 mb-2 min-w-[200px] max-w-[280px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
+					{noActiveSatellite && (
+						<div className="px-4 py-2 text-xs text-yellow-500 border-b border-border">
+							{t('nowPlaying.noActiveSatellite')}
+						</div>
+					)}
+					{satellites.map((s) => (
+						<button
+							key={s.name}
+							className={cn(
+								'w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-bg2 transition-colors',
+								s.active ? 'text-brand' : 'text-text'
+							)}
+							onClick={() => {
+								if (!s.active) onSelect(s.name);
+								setOpen(false);
+							}}>
+							<span className="flex-1 truncate">{s.name}</span>
+							{s.active && <Check className="size-3.5 shrink-0" />}
+						</button>
+					))}
+					{active && (
+						<div className="px-4 py-2 text-xs text-dim border-t border-border truncate">
+							{t('nowPlaying.activeSatellite')}: {active.name}
+						</div>
+					)}
 				</div>
 			)}
 		</div>
@@ -152,6 +231,7 @@ export function NowPlaying({
 	controls,
 	connected,
 	theme,
+	satellites,
 	onThemeToggle,
 	onOpenSearch,
 	onRefreshCache
@@ -159,8 +239,23 @@ export function NowPlaying({
 	const { t } = useTranslation();
 	const { playing, currentIdx, queue, position, duration, volume, shuffle, repeat, lastScrobble } = playerState;
 	const track = queue[currentIdx] ?? null;
-	const { devices, current, setDevice } = useAudioDevice();
 	const isDesktop = useIsDesktop();
+
+	const activeSatellite = satellites.find((s) => s.active) ?? null;
+	const noActiveSatellite = satellites.length > 0 && activeSatellite === null;
+	const [currentDevice, setCurrentDevice] = useState('');
+
+	useEffect(() => {
+		if (activeSatellite) setCurrentDevice(activeSatellite.activeDevice ?? '');
+	}, [activeSatellite]);
+
+	const handleSelectSatellite = useCallback((name: string) => {
+		apiFetch('/api/satellites/active', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name })
+		}).catch(() => {});
+	}, []);
 
 	return (
 		<div className="bg-bg1 border-t border-border shrink-0 lg:pb-[env(safe-area-inset-bottom)]">
@@ -186,6 +281,7 @@ export function NowPlaying({
 							variant="ghost"
 							size="icon-sm"
 							className="text-dim"
+							disabled={noActiveSatellite}
 							onClick={controls.prev}
 							title={t('nowPlaying.previous')}>
 							<SkipBack className="size-4" />
@@ -194,14 +290,22 @@ export function NowPlaying({
 							variant="ghost"
 							size="icon"
 							className="text-bright hover:text-brand"
+							disabled={noActiveSatellite}
 							onClick={controls.playPause}
-							title={playing ? t('nowPlaying.pause') : t('nowPlaying.play')}>
+							title={
+								noActiveSatellite
+									? t('nowPlaying.noActiveSatellite')
+									: playing
+										? t('nowPlaying.pause')
+										: t('nowPlaying.play')
+							}>
 							{playing ? <Pause className="size-4" /> : <Play className="size-4" />}
 						</Button>
 						<Button
 							variant="ghost"
 							size="icon-sm"
 							className="text-dim"
+							disabled={noActiveSatellite}
 							onClick={controls.next}
 							title={t('nowPlaying.next')}>
 							<SkipForward className="size-4" />
@@ -245,11 +349,21 @@ export function NowPlaying({
 					</div>
 				</div>
 
-				{/* Audio device + search + theme + dot — right column */}
+				{/* Audio device + satellite + search + theme + dot — right column */}
 				<div className="flex items-center justify-end gap-2 pr-2!">
-					{devices.length > 0 && (
-						<AudioDevicePopover devices={devices} current={current} setDevice={setDevice} />
+					{activeSatellite && (
+						<AudioDevicePopover
+							devices={activeSatellite.devices ?? []}
+							current={currentDevice}
+							activeSatelliteName={activeSatellite.name}
+							setDevice={setCurrentDevice}
+						/>
 					)}
+					<SatellitePopover
+						satellites={satellites}
+						noActiveSatellite={noActiveSatellite}
+						onSelect={handleSelectSatellite}
+					/>
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -283,9 +397,19 @@ export function NowPlaying({
 			<div className="flex lg:hidden items-center gap-4 px-6 pt-6 pb-4 pl-2! pr-2!">
 				<TrackInfo track={track} />
 				<div className="flex items-center gap-1 shrink-0">
-					{devices.length > 0 && (
-						<AudioDevicePopover devices={devices} current={current} setDevice={setDevice} />
+					{activeSatellite && (
+						<AudioDevicePopover
+							devices={activeSatellite.devices ?? []}
+							current={currentDevice}
+							activeSatelliteName={activeSatellite.name}
+							setDevice={setCurrentDevice}
+						/>
 					)}
+					<SatellitePopover
+						satellites={satellites}
+						noActiveSatellite={noActiveSatellite}
+						onSelect={handleSelectSatellite}
+					/>
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -329,6 +453,7 @@ export function NowPlaying({
 					variant="ghost"
 					size="icon-sm"
 					className="text-dim"
+					disabled={noActiveSatellite}
 					onClick={controls.prev}
 					title={t('nowPlaying.previous')}>
 					<SkipBack className="size-5" />
@@ -337,14 +462,22 @@ export function NowPlaying({
 					variant="ghost"
 					size="icon"
 					className="text-bright hover:text-brand size-12"
+					disabled={noActiveSatellite}
 					onClick={controls.playPause}
-					title={playing ? t('nowPlaying.pause') : t('nowPlaying.play')}>
+					title={
+						noActiveSatellite
+							? t('nowPlaying.noActiveSatellite')
+							: playing
+								? t('nowPlaying.pause')
+								: t('nowPlaying.play')
+					}>
 					{playing ? <Pause className="size-6" /> : <Play className="size-6" />}
 				</Button>
 				<Button
 					variant="ghost"
 					size="icon-sm"
 					className="text-dim"
+					disabled={noActiveSatellite}
 					onClick={controls.next}
 					title={t('nowPlaying.next')}>
 					<SkipForward className="size-5" />

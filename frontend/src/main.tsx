@@ -1,7 +1,7 @@
 import { AUTH_FAILURE_EVENT } from './api';
 import App from './App';
-import { loadConfig } from './config';
 import { LoginScreen } from './components/LoginScreen';
+import { loadConfig } from './config';
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './i18n';

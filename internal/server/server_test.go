@@ -255,7 +255,7 @@ func newTestServer(t *testing.T) (*server.Server, *fakePlayer, *fakeSubsonic) {
 	t.Helper()
 	fp := &fakePlayer{}
 	fs := &fakeSubsonic{}
-	srv := server.New(fs, fp, server.Config{}, testFS)
+	srv := server.New(fs, fp, server.Config{}, testFS, nil)
 	return srv, fp, fs
 }
 
@@ -263,7 +263,7 @@ func newTestServerWithToken(t *testing.T, token string) (*server.Server, *fakePl
 	t.Helper()
 	fp := &fakePlayer{}
 	fs := &fakeSubsonic{}
-	srv := server.New(fs, fp, server.Config{Token: token}, testFS)
+	srv := server.New(fs, fp, server.Config{Token: token}, testFS, nil)
 	return srv, fp, fs
 }
 
@@ -876,7 +876,7 @@ func TestConfig_EmptyURL(t *testing.T) {
 func TestConfig_SetURL(t *testing.T) {
 	fp := &fakePlayer{}
 	fss := &fakeSubsonic{}
-	srv := server.New(fss, fp, server.Config{URL: "https://api.example.com"}, testFS)
+	srv := server.New(fss, fp, server.Config{URL: "https://api.example.com"}, testFS, nil)
 	w := doRequest(srv.Handler(), http.MethodGet, "/config.json", "")
 	assertOK(t, w)
 	var cfg map[string]string
@@ -897,7 +897,7 @@ func TestConfig_PublicWhenTokenAuthEnabled(t *testing.T) {
 
 func newCORSServer(t *testing.T, origins string) *server.Server {
 	t.Helper()
-	return server.New(&fakeSubsonic{}, &fakePlayer{}, server.Config{CORSOrigins: origins}, testFS)
+	return server.New(&fakeSubsonic{}, &fakePlayer{}, server.Config{CORSOrigins: origins}, testFS, nil)
 }
 
 func doRequestWithOrigin(h http.Handler, method, path, origin string) *httptest.ResponseRecorder {
@@ -986,7 +986,7 @@ func TestParseMode(t *testing.T) {
 }
 
 func TestModeFrontend_APIAndWSRoutesReturn404(t *testing.T) {
-	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend}, testFS)
+	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend}, testFS, nil)
 	h := srv.Handler()
 	for _, tc := range []struct{ method, path string }{
 		{http.MethodGet, "/api/state"},
@@ -1002,7 +1002,7 @@ func TestModeFrontend_APIAndWSRoutesReturn404(t *testing.T) {
 }
 
 func TestModeFrontend_ConfigStillAvailable(t *testing.T) {
-	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend, URL: "https://api.internal"}, testFS)
+	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend, URL: "https://api.internal"}, testFS, nil)
 	w := doRequest(srv.Handler(), http.MethodGet, "/config.json", "")
 	assertOK(t, w)
 	var cfg map[string]string
@@ -1013,7 +1013,7 @@ func TestModeFrontend_ConfigStillAvailable(t *testing.T) {
 }
 
 func TestModeDaemon_StaticFilesReturn404(t *testing.T) {
-	srv := server.New(&fakeSubsonic{}, &fakePlayer{}, server.Config{Mode: server.ModeDaemon}, testFS)
+	srv := server.New(&fakeSubsonic{}, &fakePlayer{}, server.Config{Mode: server.ModeDaemon}, testFS, nil)
 	w := doRequest(srv.Handler(), http.MethodGet, "/index.html", "")
 	assertStatus(t, w, http.StatusNotFound)
 }
@@ -1041,7 +1041,7 @@ func TestSPAFallback_ExistingFileServedDirectly(t *testing.T) {
 func TestLogin_SameSiteNone_SetsSecureCookie(t *testing.T) {
 	fp := &fakePlayer{}
 	fss := &fakeSubsonic{}
-	srv := server.New(fss, fp, server.Config{Token: "tok", CookieSameSite: http.SameSiteNoneMode}, testFS)
+	srv := server.New(fss, fp, server.Config{Token: "tok", CookieSameSite: http.SameSiteNoneMode}, testFS, nil)
 	r := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=tok"))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
@@ -1064,7 +1064,7 @@ func TestLogin_SameSiteNone_SetsSecureCookie(t *testing.T) {
 func TestLogin_SameSiteLax_NotSecure(t *testing.T) {
 	fp := &fakePlayer{}
 	fss := &fakeSubsonic{}
-	srv := server.New(fss, fp, server.Config{Token: "tok", CookieSameSite: http.SameSiteLaxMode}, testFS)
+	srv := server.New(fss, fp, server.Config{Token: "tok", CookieSameSite: http.SameSiteLaxMode}, testFS, nil)
 	r := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=tok"))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()

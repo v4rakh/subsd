@@ -4,9 +4,11 @@
 
 A music player for Navidrome (and any Subsonic-compatible server).
 
-**Audio plays on the machine running subsd** — the web interface is a remote control, not a streaming client. No audio reaches the browser. This makes it well suited for running on a home server, media PC, or any Linux box connected to speakers, controlling playback from any device on the network.
+**Audio plays on the machine running subsd** or on any number of **subsd satellites** — separate processes running on other machines (a Raspberry Pi in the living room, a media PC in the bedroom, etc.) that register with the daemon and handle local playback there. The web interface is a remote control, not a streaming client: you switch the active playback device from the UI, and no audio ever reaches the browser. This makes it well suited for a multi-room setup, a home server, or any Linux box connected to speakers, controlled from any device on the network.
 
-It uses mpv's IPC for playback. The subsonic client is adapted from [stmps](https://github.com/wildeyedskies/stmps) (MIT).
+There's also a command-line tool to control the subsd daemon remotely.
+
+subsd uses mpv's IPC for playback (adapted from [stmps](https://github.com/wildeyedskies/stmps) (MIT)) and gRPC for communication with its satellites.
 
 Contributions are very welcome, please see [Development & contribution](#development-and-contribution).
 
@@ -55,29 +57,84 @@ All flags can also be set via environment variables (shown in the tables below) 
 
 ### Required flags
 
-| Flag     | Environment  | Description                                                             |
-| -------- | ------------ | ----------------------------------------------------------------------- |
-| `--host` | `SUBSD_HOST` | URL of your Navidrome/Subsonic server (e.g. `http://192.168.1.10:4533`) |
-| `--user` | `SUBSD_USER` | Username                                                                |
-| `--pass` | `SUBSD_PASS` | Password                                                                |
+| Flag              | Environment           | Description                                                             |
+| ----------------- | --------------------- | ----------------------------------------------------------------------- |
+| `--subsonic-host` | `SUBSD_SUBSONIC_HOST` | URL of your Navidrome/Subsonic server (e.g. `http://192.168.1.10:4533`) |
+| `--subsonic-user` | `SUBSD_SUBSONIC_USER` | Username                                                                |
+| `--subsonic-pass` | `SUBSD_SUBSONIC_PASS` | Password                                                                |
 
 ### Options
 
-| Flag             | Environment          | Default               | Description                                                                 |
-| ---------------- | -------------------- | --------------------- | --------------------------------------------------------------------------- |
-| `--user-file`    | `SUBSD_USER_FILE`    | —                     | Read username from a file instead of `--user`                               |
-| `--pass-file`    | `SUBSD_PASS_FILE`    | —                     | Read password from a file instead of `--pass`                               |
-| `--addr`         | `SUBSD_ADDR`         | `:8080`               | Address the web UI listens on                                               |
-| `--token`        | `SUBSD_TOKEN`        | —                     | Shared access token; if set, requires login before the UI is accessible     |
-| `--token-file`   | `SUBSD_TOKEN_FILE`   | —                     | Read access token from a file instead of `--token`                          |
-| `--tls-cert`     | `SUBSD_TLS_CERT`     | —                     | Path to TLS certificate file (enables HTTPS when combined with `--tls-key`) |
-| `--tls-key`      | `SUBSD_TLS_KEY`      | —                     | Path to TLS private key file                                                |
-| `--mpv-socket`   | `SUBSD_MPV_SOCKET`   | `/tmp/subsd-mpv.sock` | Unix socket path used to communicate with mpv                               |
-| `--state-file`   | `SUBSD_STATE_FILE`   | _(platform default)_  | Path to the playback state persistence file                                 |
-| `--log-level`    | `SUBSD_LOG_LEVEL`    | `info`                | Log verbosity: `debug`, `info`, `warn`, or `error`                          |
-| `--read-timeout` | `SUBSD_READ_TIMEOUT` | `60s`                 | HTTP server read timeout                                                    |
+#### General
 
-`--user`/`--pass`/`--token` and their corresponding `--*-file` variants are mutually exclusive — use one or the other, not both.
+| Flag             | Environment          | Default                      | Description                                                                                        |
+| ---------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| `--addr`         | `SUBSD_ADDR`         | `:8080`                      | Address the web UI listens on                                                                      |
+| `--log-level`    | `SUBSD_LOG_LEVEL`    | `info`                       | Log verbosity: `debug`, `info`, `warn`, or `error`                                                 |
+| `--read-timeout` | `SUBSD_READ_TIMEOUT` | `60s`                        | HTTP server read timeout                                                                           |
+| `--mode`         | `SUBSD_MODE`         | `full`                       | Operating mode: `full` (API + frontend), `daemon` (API only), `frontend` (UI only), or `satellite` |
+| `--url`          | `SUBSD_URL`          | —                            | Base URL of the API server; required in `frontend` mode                                            |
+| `--state-file`   | `SUBSD_STATE_FILE`   | _(platform default)_         | Path to the playback state persistence file                                                        |
+| `--mpv-socket`   | `SUBSD_MPV_SOCKET`   | `/tmp/subsd-mpv-<uuid>.sock` | mpv IPC socket path                                                                                |
+
+#### Authentication & TLS (HTTP)
+
+| Flag                | Environment             | Default | Description                                                                 |
+| ------------------- | ----------------------- | ------- | --------------------------------------------------------------------------- |
+| `--token`           | `SUBSD_TOKEN`           | —       | Shared access token; if set, requires login before the UI is accessible     |
+| `--token-file`      | `SUBSD_TOKEN_FILE`      | —       | Read access token from a file instead of `--token`                          |
+| `--tls-cert`        | `SUBSD_TLS_CERT`        | —       | Path to TLS certificate file (enables HTTPS when combined with `--tls-key`) |
+| `--tls-key`         | `SUBSD_TLS_KEY`         | —       | Path to TLS private key file                                                |
+| `--cors-origins`    | `SUBSD_CORS_ORIGINS`    | `*`     | Comma-separated allowed CORS origins; use `*` for any                       |
+| `--cookie-samesite` | `SUBSD_COOKIE_SAMESITE` | —       | SameSite policy for the session cookie (`strict`, `lax`, `none`)            |
+
+#### Subsonic credentials
+
+| Flag                   | Environment                | Default | Description                                            |
+| ---------------------- | -------------------------- | ------- | ------------------------------------------------------ |
+| `--subsonic-user-file` | `SUBSD_SUBSONIC_USER_FILE` | —       | Read username from a file instead of `--subsonic-user` |
+| `--subsonic-pass-file` | `SUBSD_SUBSONIC_PASS_FILE` | —       | Read password from a file instead of `--subsonic-pass` |
+
+`--subsonic-user`/`--subsonic-pass`/`--token` and their `--*-file` variants are mutually exclusive — use one or the other, not both.
+
+#### Cache
+
+| Flag                       | Environment                    | Default | Description                                                                        |
+| -------------------------- | ------------------------------ | ------- | ---------------------------------------------------------------------------------- |
+| `--cache-library-ttl`      | `SUBSD_CACHE_LIBRARY_TTL`      | `5m`    | TTL for library metadata cache entries (artists, albums, playlists, songs)         |
+| `--cache-coverart-ttl`     | `SUBSD_CACHE_COVERART_TTL`     | `24h`   | TTL for cover art cache entries                                                    |
+| `--cache-refresh-interval` | `SUBSD_CACHE_REFRESH_INTERVAL` | `1h`    | How often to refresh the full library cache in the background (0 = on-demand only) |
+
+#### Satellites (gRPC)
+
+These flags control the gRPC server (daemon/full mode) and client (satellite mode). TLS and the shared token are both optional and independent — use neither, either, or both.
+
+| Flag                                   | Environment                                | Default      | Description                                                                                      |
+| -------------------------------------- | ------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
+| `--grpc-addr`                          | `SUBSD_GRPC_ADDR`                          | `:9090`      | gRPC listen address (daemon/full) or dial address (satellite)                                    |
+| `--satellite-name`                     | `SUBSD_SATELLITE_NAME`                     | _(hostname)_ | Stable name for this satellite (satellite mode)                                                  |
+| `--grpc-tls-cert`                      | `SUBSD_GRPC_TLS_CERT`                      | —            | TLS certificate for the gRPC server (daemon/full modes)                                          |
+| `--grpc-tls-key`                       | `SUBSD_GRPC_TLS_KEY`                       | —            | TLS private key for the gRPC server (daemon/full modes)                                          |
+| `--grpc-tls`                           | `SUBSD_GRPC_TLS`                           | `false`      | Dial gRPC with TLS using system root CAs (satellite mode)                                        |
+| `--grpc-tls-ca`                        | `SUBSD_GRPC_TLS_CA`                        | —            | CA certificate for verifying the gRPC server; implies TLS; use for self-signed certs (satellite) |
+| `--grpc-token`                         | `SUBSD_GRPC_TOKEN`                         | —            | Shared secret for satellite authentication (sent as `x-subsd-token`); used by both sides         |
+| `--grpc-token-file`                    | `SUBSD_GRPC_TOKEN_FILE`                    | —            | Read gRPC shared secret from a file instead of `--grpc-token`                                    |
+| `--satellite-heartbeat-timeout`        | `SUBSD_SATELLITE_HEARTBEAT_TIMEOUT`        | `15s`        | How long a satellite may be silent before the server disconnects it (daemon/full)                |
+| `--satellite-heartbeat-check-interval` | `SUBSD_SATELLITE_HEARTBEAT_CHECK_INTERVAL` | `5s`         | How often the server checks for satellite heartbeat timeouts (daemon/full)                       |
+| `--satellite-heartbeat-interval`       | `SUBSD_SATELLITE_HEARTBEAT_INTERVAL`       | `5s`         | How often a satellite sends heartbeats upstream (satellite mode)                                 |
+| `--satellite-state-interval`           | `SUBSD_SATELLITE_STATE_INTERVAL`           | `1s`         | How often a satellite pushes playback state upstream (satellite mode)                            |
+| `--satellite-reconnect-interval`       | `SUBSD_SATELLITE_RECONNECT_INTERVAL`       | `5s`         | How long a satellite waits before retrying a lost connection (satellite mode)                    |
+
+A warning is logged if `--grpc-token` is set without TLS — the token would be sent in plaintext.
+
+### Remote CLI
+
+The `subsd remote` subcommand controls a running daemon over HTTP. Configure it via `~/.config/subsd/cli.toml` or flags/env vars:
+
+| Flag / env                       | Description                                              |
+| -------------------------------- | -------------------------------------------------------- |
+| `--url` / `SUBSD_REMOTE_URL`     | Base URL of the daemon (e.g. `http://192.168.1.10:8080`) |
+| `--token` / `SUBSD_REMOTE_TOKEN` | Access token (same as `--token` on the daemon)           |
 
 ## Deployment
 
