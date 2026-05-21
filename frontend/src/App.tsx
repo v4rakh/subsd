@@ -242,7 +242,7 @@ export default function App() {
 					if (window.innerWidth >= 1024) setShowSearch(true);
 					else setMobileTab('search');
 				}}
-				onRefreshCache={() => apiFetch('/api/cache', { method: 'POST' }).catch(() => {})}
+				onRefreshCache={() => apiFetch('/api/v1/cache', { method: 'POST' }).catch(() => {})}
 			/>
 
 			{/* Mobile tab bar */}

@@ -38,7 +38,7 @@ function PlaylistRow({
 			{playlist.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
-					src={apiUrl(`/api/coverart/${playlist.coverArt}`)}
+					src={apiUrl(`/api/v1/coverart/${playlist.coverArt}`)}
 					alt=""
 					loading="lazy"
 					onError={(e) => {

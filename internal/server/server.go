@@ -104,6 +104,12 @@ func (c *wsClient) send(data []byte) error {
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
+// wsPlayerMsg wraps player.State with a v (version) field for the WebSocket envelope.
+type wsPlayerMsg struct {
+	V int `json:"v"`
+	player.State
+}
+
 // Mode controls which subsystems the server activates.
 type Mode int
 
@@ -295,57 +301,57 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/ws", s.handleWS)
 
 		// ── Player controls ───────────────────────────────────────────────
-		r.Post("/api/play", s.handlePlay)
-		r.Post("/api/pause", s.handlePause)
-		r.Post("/api/playpause", s.handlePlayPause)
-		r.Post("/api/next", s.handleNext)
-		r.Post("/api/prev", s.handlePrev)
-		r.Post("/api/seek", s.handleSeek)
-		r.Post("/api/volume", s.handleVolume)
-		r.Post("/api/shuffle", s.handleShuffle)
-		r.Post("/api/repeat", s.handleRepeat)
+		r.Post("/api/v1/play", s.handlePlay)
+		r.Post("/api/v1/pause", s.handlePause)
+		r.Post("/api/v1/playpause", s.handlePlayPause)
+		r.Post("/api/v1/next", s.handleNext)
+		r.Post("/api/v1/prev", s.handlePrev)
+		r.Post("/api/v1/seek", s.handleSeek)
+		r.Post("/api/v1/volume", s.handleVolume)
+		r.Post("/api/v1/shuffle", s.handleShuffle)
+		r.Post("/api/v1/repeat", s.handleRepeat)
 
 		// ── Queue ─────────────────────────────────────────────────────────
-		r.Delete("/api/queue", s.handleClearQueue)
-		r.Delete("/api/queue/{idx}", s.handleDequeue)
-		r.Post("/api/queue/song/{id}", s.handleEnqueueSong)
-		r.Post("/api/queue/album/{id}", s.handleEnqueueAlbum)
-		r.Post("/api/queue/jump/{idx}", s.handleJump)
-		r.Post("/api/queue/move", s.handleMove)
-		r.Post("/api/play/song/{id}", s.handlePlaySong)
-		r.Post("/api/play/album/{id}", s.handlePlayAlbum)
+		r.Delete("/api/v1/queue", s.handleClearQueue)
+		r.Delete("/api/v1/queue/{idx}", s.handleDequeue)
+		r.Post("/api/v1/queue/song/{id}", s.handleEnqueueSong)
+		r.Post("/api/v1/queue/album/{id}", s.handleEnqueueAlbum)
+		r.Post("/api/v1/queue/jump/{idx}", s.handleJump)
+		r.Post("/api/v1/queue/move", s.handleMove)
+		r.Post("/api/v1/play/song/{id}", s.handlePlaySong)
+		r.Post("/api/v1/play/album/{id}", s.handlePlayAlbum)
 
 		// ── Library ───────────────────────────────────────────────────────
-		r.Get("/api/artists", s.handleArtists)
-		r.Get("/api/artist/{id}", s.handleArtist)
-		r.Get("/api/album/{id}", s.handleAlbum)
-		r.Get("/api/search", s.handleSearch)
-		r.Get("/api/coverart/{id}", s.handleCoverArt)
+		r.Get("/api/v1/artists", s.handleArtists)
+		r.Get("/api/v1/artist/{id}", s.handleArtist)
+		r.Get("/api/v1/album/{id}", s.handleAlbum)
+		r.Get("/api/v1/search", s.handleSearch)
+		r.Get("/api/v1/coverart/{id}", s.handleCoverArt)
 
 		// ── Playlists ─────────────────────────────────────────────────────
-		r.Get("/api/playlists", s.handlePlaylists)
-		r.Get("/api/playlist/{id}", s.handlePlaylist)
-		r.Post("/api/play/playlist/{id}", s.handlePlayPlaylist)
-		r.Post("/api/queue/playlist/{id}", s.handleEnqueuePlaylist)
+		r.Get("/api/v1/playlists", s.handlePlaylists)
+		r.Get("/api/v1/playlist/{id}", s.handlePlaylist)
+		r.Post("/api/v1/play/playlist/{id}", s.handlePlayPlaylist)
+		r.Post("/api/v1/queue/playlist/{id}", s.handleEnqueuePlaylist)
 
 		// ── Audio devices ─────────────────────────────────────────────────
-		r.Get("/api/devices", s.handleDevices)
-		r.Post("/api/device", s.handleDevice)
+		r.Get("/api/v1/devices", s.handleDevices)
+		r.Post("/api/v1/device", s.handleDevice)
 
 		// ── Satellites ────────────────────────────────────────────────────
 		if s.registry != nil {
-			r.Get("/api/satellites", s.handleSatellites)
-			r.Post("/api/satellites/active", s.handleSatelliteSetActive)
-			r.Post("/api/satellites/{name}/device", s.handleSatelliteSetDevice)
-			r.Post("/api/satellites/{name}/devices/refresh", s.handleSatelliteRefreshDevices)
+			r.Get("/api/v1/satellites", s.handleSatellites)
+			r.Post("/api/v1/satellites/active", s.handleSatelliteSetActive)
+			r.Post("/api/v1/satellites/{name}/device", s.handleSatelliteSetDevice)
+			r.Post("/api/v1/satellites/{name}/devices/refresh", s.handleSatelliteRefreshDevices)
 		}
 
 		// ── Cache ─────────────────────────────────────────────────────────
-		r.Delete("/api/cache", s.handleClearCache)
-		r.Post("/api/cache", s.handleRefreshCache)
+		r.Delete("/api/v1/cache", s.handleClearCache)
+		r.Post("/api/v1/cache", s.handleRefreshCache)
 
 		// ── State snapshot ────────────────────────────────────────────────
-		r.Get("/api/state", s.handleState)
+		r.Get("/api/v1/state", s.handleState)
 	}
 
 	if s.mode.ServesFrontend() {
@@ -424,7 +430,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	// Send full state immediately so the new client is in sync. This write
 	// and any concurrent broadcast both go through wc.send, which holds
 	// wc.mu, so they cannot interleave on the connection.
-	if data, err := json.Marshal(s.player.GetState()); err == nil {
+	if data, err := json.Marshal(wsPlayerMsg{V: 1, State: s.player.GetState()}); err == nil {
 		if err := wc.send(data); err != nil {
 			log.Debug().Err(err).Msg("server: ws initial send failed")
 			s.mu.Lock()
@@ -437,9 +443,10 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	// Also send initial satellite list if available.
 	if s.registry != nil {
 		msg := struct {
+			V          int              `json:"v"`
 			Type       string           `json:"type"`
 			Satellites []satellite.Info `json:"satellites"`
-		}{Type: "satellites", Satellites: s.registry.List()}
+		}{V: 1, Type: "satellites", Satellites: s.registry.List()}
 		if data, err := json.Marshal(msg); err == nil {
 			wc.send(data) //nolint:errcheck,gosec
 		}
@@ -459,7 +466,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) broadcast(state player.State) {
-	data, _ := json.Marshal(state)
+	data, _ := json.Marshal(wsPlayerMsg{V: 1, State: state})
 	s.broadcastRaw(data)
 }
 
@@ -478,9 +485,10 @@ func (s *Server) broadcastSatelliteDisconnected(name string) {
 // broadcastSatellites sends a satellite list update to all WebSocket clients.
 func (s *Server) broadcastSatellites(list []satellite.Info) {
 	msg := struct {
+		V          int              `json:"v"`
 		Type       string           `json:"type"`
 		Satellites []satellite.Info `json:"satellites"`
-	}{Type: "satellites", Satellites: list}
+	}{V: 1, Type: "satellites", Satellites: list}
 	data, _ := json.Marshal(msg)
 	s.broadcastRaw(data)
 }
@@ -1161,7 +1169,7 @@ func (s *Server) toTrack(song subsonic.Song) player.Track {
 		Artist:       song.Artist,
 		Album:        song.Album,
 		Duration:     song.Duration,
-		CoverArt:     "/api/coverart/" + song.CoverArt,
+		CoverArt:     "/api/v1/coverart/" + song.CoverArt,
 		StreamURL:    s.client.StreamURL(song.ID),
 		Suffix:       song.Suffix,
 		BitRate:      song.BitRate,

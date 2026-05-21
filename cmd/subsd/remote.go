@@ -198,7 +198,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/play", nil)
+				return c.post(ctx, "/api/v1/play", nil)
 			},
 		},
 		{
@@ -209,7 +209,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/pause", nil)
+				return c.post(ctx, "/api/v1/pause", nil)
 			},
 		},
 		{
@@ -220,7 +220,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/playpause", nil)
+				return c.post(ctx, "/api/v1/playpause", nil)
 			},
 		},
 		{
@@ -231,7 +231,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/next", nil)
+				return c.post(ctx, "/api/v1/next", nil)
 			},
 		},
 		{
@@ -242,7 +242,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/prev", nil)
+				return c.post(ctx, "/api/v1/prev", nil)
 			},
 		},
 		{
@@ -262,7 +262,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/seek", map[string]float64{"position": pos})
+				return c.post(ctx, "/api/v1/seek", map[string]float64{"position": pos})
 			},
 		},
 		{
@@ -282,7 +282,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/volume", map[string]int{"volume": vol})
+				return c.post(ctx, "/api/v1/volume", map[string]int{"volume": vol})
 			},
 		},
 		{
@@ -293,7 +293,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/shuffle", nil)
+				return c.post(ctx, "/api/v1/shuffle", nil)
 			},
 		},
 		{
@@ -304,7 +304,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/repeat", nil)
+				return c.post(ctx, "/api/v1/repeat", nil)
 			},
 		},
 		{
@@ -315,7 +315,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/state")
+				data, err := c.get(ctx, "/api/v1/state")
 				if err != nil {
 					return err
 				}
@@ -336,7 +336,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/play/song/"+id, nil)
+				return c.post(ctx, "/api/v1/play/song/"+id, nil)
 			},
 		},
 		{
@@ -352,7 +352,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/play/album/"+id, nil)
+				return c.post(ctx, "/api/v1/play/album/"+id, nil)
 			},
 		},
 		{
@@ -368,7 +368,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/play/playlist/"+id, nil)
+				return c.post(ctx, "/api/v1/play/playlist/"+id, nil)
 			},
 		},
 		// ── Queue management ──────────────────────────────────────────────
@@ -384,7 +384,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.delete(ctx, "/api/queue")
+						return c.delete(ctx, "/api/v1/queue")
 					},
 				},
 				{
@@ -400,7 +400,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.delete(ctx, "/api/queue/"+strconv.Itoa(idx))
+						return c.delete(ctx, "/api/v1/queue/"+strconv.Itoa(idx))
 					},
 				},
 				{
@@ -416,7 +416,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/queue/jump/"+strconv.Itoa(idx), nil)
+						return c.post(ctx, "/api/v1/queue/jump/"+strconv.Itoa(idx), nil)
 					},
 				},
 				{
@@ -439,7 +439,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/queue/move", map[string]int{"from": from, "to": to})
+						return c.post(ctx, "/api/v1/queue/move", map[string]int{"from": from, "to": to})
 					},
 				},
 				{
@@ -455,7 +455,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/queue/song/"+id, nil)
+						return c.post(ctx, "/api/v1/queue/song/"+id, nil)
 					},
 				},
 				{
@@ -471,7 +471,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/queue/album/"+id, nil)
+						return c.post(ctx, "/api/v1/queue/album/"+id, nil)
 					},
 				},
 				{
@@ -487,7 +487,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/queue/playlist/"+id, nil)
+						return c.post(ctx, "/api/v1/queue/playlist/"+id, nil)
 					},
 				},
 			},
@@ -501,7 +501,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/artists")
+				data, err := c.get(ctx, "/api/v1/artists")
 				if err != nil {
 					return err
 				}
@@ -521,7 +521,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/artist/"+id)
+				data, err := c.get(ctx, "/api/v1/artist/"+id)
 				if err != nil {
 					return err
 				}
@@ -541,7 +541,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/album/"+id)
+				data, err := c.get(ctx, "/api/v1/album/"+id)
 				if err != nil {
 					return err
 				}
@@ -561,7 +561,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/search?q="+url.QueryEscape(q))
+				data, err := c.get(ctx, "/api/v1/search?q="+url.QueryEscape(q))
 				if err != nil {
 					return err
 				}
@@ -576,7 +576,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/playlists")
+				data, err := c.get(ctx, "/api/v1/playlists")
 				if err != nil {
 					return err
 				}
@@ -596,7 +596,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/playlist/"+id)
+				data, err := c.get(ctx, "/api/v1/playlist/"+id)
 				if err != nil {
 					return err
 				}
@@ -612,7 +612,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/satellites")
+				data, err := c.get(ctx, "/api/v1/satellites")
 				if err != nil {
 					return err
 				}
@@ -632,7 +632,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/satellites/active", map[string]string{"name": name})
+				return c.post(ctx, "/api/v1/satellites/active", map[string]string{"name": name})
 			},
 		},
 		{
@@ -649,7 +649,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/satellites/"+satName+"/device", map[string]string{"device": device})
+				return c.post(ctx, "/api/v1/satellites/"+satName+"/device", map[string]string{"device": device})
 			},
 		},
 		{
@@ -665,7 +665,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/satellites")
+				data, err := c.get(ctx, "/api/v1/satellites")
 				if err != nil {
 					return err
 				}
@@ -692,7 +692,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				data, err := c.get(ctx, "/api/devices")
+				data, err := c.get(ctx, "/api/v1/devices")
 				if err != nil {
 					return err
 				}
@@ -712,7 +712,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/device", map[string]string{"name": name})
+				return c.post(ctx, "/api/v1/device", map[string]string{"name": name})
 			},
 		},
 		// ── Cache ─────────────────────────────────────────────────────────
@@ -728,7 +728,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.delete(ctx, "/api/cache")
+						return c.delete(ctx, "/api/v1/cache")
 					},
 				},
 				{
@@ -739,7 +739,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/cache", nil)
+						return c.post(ctx, "/api/v1/cache", nil)
 					},
 				},
 			},

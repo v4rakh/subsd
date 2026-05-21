@@ -320,14 +320,14 @@ func decodeJSON(t *testing.T, body io.Reader, v any) {
 func TestAuth_Disabled_AllowsAnything(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	h := srv.Handler()
-	w := doRequest(h, http.MethodGet, "/api/state", "")
+	w := doRequest(h, http.MethodGet, "/api/v1/state", "")
 	assertOK(t, w)
 }
 
 func TestAuth_MissingCookie_API_Returns401(t *testing.T) {
 	srv, _, _ := newTestServerWithToken(t, "secret")
 	h := srv.Handler()
-	w := doRequest(h, http.MethodGet, "/api/state", "")
+	w := doRequest(h, http.MethodGet, "/api/v1/state", "")
 	assertStatus(t, w, http.StatusUnauthorized)
 	var body map[string]string
 	decodeJSON(t, w.Body, &body)
@@ -339,14 +339,14 @@ func TestAuth_MissingCookie_API_Returns401(t *testing.T) {
 func TestAuth_WrongCookie_API_Returns401(t *testing.T) {
 	srv, _, _ := newTestServerWithToken(t, "secret")
 	h := srv.Handler()
-	w := doRequestWithCookie(h, http.MethodGet, "/api/state", "", "wrong")
+	w := doRequestWithCookie(h, http.MethodGet, "/api/v1/state", "", "wrong")
 	assertStatus(t, w, http.StatusUnauthorized)
 }
 
 func TestAuth_CorrectCookie_Allows(t *testing.T) {
 	srv, _, _ := newTestServerWithToken(t, "secret")
 	h := srv.Handler()
-	w := doRequestWithCookie(h, http.MethodGet, "/api/state", "", "secret")
+	w := doRequestWithCookie(h, http.MethodGet, "/api/v1/state", "", "secret")
 	assertOK(t, w)
 }
 
@@ -409,7 +409,7 @@ func TestHandleState(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
 	fp.state = player.State{Playing: true, Volume: 75}
 	h := srv.Handler()
-	w := doRequest(h, http.MethodGet, "/api/state", "")
+	w := doRequest(h, http.MethodGet, "/api/v1/state", "")
 	assertOK(t, w)
 	var state player.State
 	decodeJSON(t, w.Body, &state)
@@ -420,7 +420,7 @@ func TestHandleState(t *testing.T) {
 
 func TestHandlePlayPause(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/playpause", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playpause", "")
 	assertOK(t, w)
 	if !fp.called("playpause") {
 		t.Error("expected PlayPause to be called")
@@ -429,7 +429,7 @@ func TestHandlePlayPause(t *testing.T) {
 
 func TestHandlePlay(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodPost, "/api/play", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/play", "")
 	if !fp.called("play") {
 		t.Error("expected Play to be called")
 	}
@@ -437,7 +437,7 @@ func TestHandlePlay(t *testing.T) {
 
 func TestHandlePause(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodPost, "/api/pause", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/pause", "")
 	if !fp.called("pause") {
 		t.Error("expected Pause to be called")
 	}
@@ -445,7 +445,7 @@ func TestHandlePause(t *testing.T) {
 
 func TestHandleNext(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodPost, "/api/next", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/next", "")
 	if !fp.called("next") {
 		t.Error("expected Next to be called")
 	}
@@ -453,7 +453,7 @@ func TestHandleNext(t *testing.T) {
 
 func TestHandlePrev(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodPost, "/api/prev", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/prev", "")
 	if !fp.called("prev") {
 		t.Error("expected Prev to be called")
 	}
@@ -461,7 +461,7 @@ func TestHandlePrev(t *testing.T) {
 
 func TestHandleShuffle(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodPost, "/api/shuffle", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/shuffle", "")
 	if !fp.called("shuffle") {
 		t.Error("expected ToggleShuffle to be called")
 	}
@@ -469,7 +469,7 @@ func TestHandleShuffle(t *testing.T) {
 
 func TestHandleRepeat(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodPost, "/api/repeat", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/repeat", "")
 	if !fp.called("repeat") {
 		t.Error("expected ToggleRepeat to be called")
 	}
@@ -477,7 +477,7 @@ func TestHandleRepeat(t *testing.T) {
 
 func TestHandleSeek(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/seek", `{"position":42.5}`)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/seek", `{"position":42.5}`)
 	assertOK(t, w)
 	if fp.state.Position != 42.5 {
 		t.Errorf("Position: got %f, want 42.5", fp.state.Position)
@@ -486,13 +486,13 @@ func TestHandleSeek(t *testing.T) {
 
 func TestHandleSeek_BadBody(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/seek", `not json`)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/seek", `not json`)
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
 func TestHandleVolume(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/volume", `{"volume":60}`)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/volume", `{"volume":60}`)
 	assertOK(t, w)
 	if fp.state.Volume != 60 {
 		t.Errorf("Volume: got %d, want 60", fp.state.Volume)
@@ -501,7 +501,7 @@ func TestHandleVolume(t *testing.T) {
 
 func TestHandleVolume_BadBody(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/volume", `bad`)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/volume", `bad`)
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -509,7 +509,7 @@ func TestHandleVolume_BadBody(t *testing.T) {
 
 func TestHandleClearQueue(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	doRequest(srv.Handler(), http.MethodDelete, "/api/queue", "")
+	doRequest(srv.Handler(), http.MethodDelete, "/api/v1/queue", "")
 	if !fp.called("clear") {
 		t.Error("expected ClearQueue to be called")
 	}
@@ -517,7 +517,7 @@ func TestHandleClearQueue(t *testing.T) {
 
 func TestHandleDequeue(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodDelete, "/api/queue/2", "")
+	w := doRequest(srv.Handler(), http.MethodDelete, "/api/v1/queue/2", "")
 	assertOK(t, w)
 	if !fp.called("dequeue") {
 		t.Error("expected RemoveFromQueue to be called")
@@ -526,13 +526,13 @@ func TestHandleDequeue(t *testing.T) {
 
 func TestHandleDequeue_BadIdx(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodDelete, "/api/queue/notanumber", "")
+	w := doRequest(srv.Handler(), http.MethodDelete, "/api/v1/queue/notanumber", "")
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
 func TestHandleJump(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/jump/3", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/jump/3", "")
 	assertOK(t, w)
 	if !fp.called("jump") {
 		t.Error("expected JumpTo to be called")
@@ -541,13 +541,13 @@ func TestHandleJump(t *testing.T) {
 
 func TestHandleJump_BadIdx(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/jump/nope", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/jump/nope", "")
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
 func TestHandleMove(t *testing.T) {
 	srv, fp, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/move", `{"from":0,"to":2}`)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/move", `{"from":0,"to":2}`)
 	assertOK(t, w)
 	if !fp.called("move") {
 		t.Error("expected MoveInQueue to be called")
@@ -556,7 +556,7 @@ func TestHandleMove(t *testing.T) {
 
 func TestHandleMove_BadBody(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/move", `bad`)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/move", `bad`)
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -565,7 +565,7 @@ func TestHandleMove_BadBody(t *testing.T) {
 func TestHandleEnqueueSong(t *testing.T) {
 	srv, fp, fs := newTestServer(t)
 	fs.song = &subsonic.Song{ID: "s1", Title: "T1", CoverArt: "ca1"}
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/song/s1", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/song/s1", "")
 	assertOK(t, w)
 	fp.mu.Lock()
 	added := fp.addedTracks
@@ -578,14 +578,14 @@ func TestHandleEnqueueSong(t *testing.T) {
 func TestHandleEnqueueSong_ClientError(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.err = io.EOF
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/song/bad", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/song/bad", "")
 	assertStatus(t, w, http.StatusInternalServerError)
 }
 
 func TestHandlePlaySong(t *testing.T) {
 	srv, fp, fs := newTestServer(t)
 	fs.song = &subsonic.Song{ID: "s2", Title: "T2", CoverArt: "ca2"}
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/play/song/s2", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/play/song/s2", "")
 	assertOK(t, w)
 	fp.mu.Lock()
 	sq := fp.setQueueCalls
@@ -601,7 +601,7 @@ func TestHandleEnqueueAlbum(t *testing.T) {
 		ID:    "alb1",
 		Songs: []subsonic.Song{{ID: "s1"}, {ID: "s2"}, {ID: "s3"}},
 	}
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/album/alb1", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/album/alb1", "")
 	assertOK(t, w)
 	fp.mu.Lock()
 	added := fp.addedTracks
@@ -617,7 +617,7 @@ func TestHandlePlayAlbum(t *testing.T) {
 		ID:    "alb2",
 		Songs: []subsonic.Song{{ID: "s1"}, {ID: "s2"}},
 	}
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/play/album/alb2", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/play/album/alb2", "")
 	assertOK(t, w)
 	fp.mu.Lock()
 	sq := fp.setQueueCalls
@@ -632,7 +632,7 @@ func TestHandlePlayAlbum(t *testing.T) {
 func TestHandlePlaylists(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.playlists = []subsonic.Playlist{{ID: "p1", Name: "PL1"}, {ID: "p2", Name: "PL2"}}
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/playlists", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/playlists", "")
 	assertOK(t, w)
 	var pls []subsonic.Playlist
 	decodeJSON(t, w.Body, &pls)
@@ -644,7 +644,7 @@ func TestHandlePlaylists(t *testing.T) {
 func TestHandlePlaylist(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.playlist = &subsonic.Playlist{ID: "p1", Name: "PL1"}
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/playlist/p1", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/playlist/p1", "")
 	assertOK(t, w)
 	var pl subsonic.Playlist
 	decodeJSON(t, w.Body, &pl)
@@ -659,7 +659,7 @@ func TestHandlePlayPlaylist(t *testing.T) {
 		ID:    "p1",
 		Songs: []subsonic.Song{{ID: "s1"}, {ID: "s2"}},
 	}
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/play/playlist/p1", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/play/playlist/p1", "")
 	assertOK(t, w)
 	fp.mu.Lock()
 	sq := fp.setQueueCalls
@@ -675,7 +675,7 @@ func TestHandleEnqueuePlaylist(t *testing.T) {
 		ID:    "p2",
 		Songs: []subsonic.Song{{ID: "s3"}, {ID: "s4"}, {ID: "s5"}},
 	}
-	w := doRequest(srv.Handler(), http.MethodPost, "/api/queue/playlist/p2", "")
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/playlist/p2", "")
 	assertOK(t, w)
 	fp.mu.Lock()
 	added := fp.addedTracks
@@ -690,7 +690,7 @@ func TestHandleEnqueuePlaylist(t *testing.T) {
 func TestHandleArtists(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.artists = []subsonic.Artist{{ID: "a1", Name: "The Ones"}, {ID: "a2", Name: "The Twos"}}
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/artists", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/artists", "")
 	assertOK(t, w)
 	var artists []subsonic.Artist
 	decodeJSON(t, w.Body, &artists)
@@ -703,11 +703,11 @@ func TestHandleArtists_CacheHit(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.artists = []subsonic.Artist{{ID: "a1"}}
 	h := srv.Handler()
-	doRequest(h, http.MethodGet, "/api/artists", "") // populate cache
+	doRequest(h, http.MethodGet, "/api/v1/artists", "") // populate cache
 	fs.mu.Lock()
 	fs.artists = []subsonic.Artist{{ID: "a2"}} // change backing data
 	fs.mu.Unlock()
-	w := doRequest(h, http.MethodGet, "/api/artists", "") // should hit cache
+	w := doRequest(h, http.MethodGet, "/api/v1/artists", "") // should hit cache
 	var artists []subsonic.Artist
 	decodeJSON(t, w.Body, &artists)
 	if len(artists) != 1 || artists[0].ID != "a1" {
@@ -719,12 +719,12 @@ func TestHandleArtists_CacheCleared(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.artists = []subsonic.Artist{{ID: "a1"}}
 	h := srv.Handler()
-	doRequest(h, http.MethodGet, "/api/artists", "")  // populate cache
-	doRequest(h, http.MethodDelete, "/api/cache", "") // clear cache
+	doRequest(h, http.MethodGet, "/api/v1/artists", "")  // populate cache
+	doRequest(h, http.MethodDelete, "/api/v1/cache", "") // clear cache
 	fs.mu.Lock()
 	fs.artists = []subsonic.Artist{{ID: "a2"}}
 	fs.mu.Unlock()
-	w := doRequest(h, http.MethodGet, "/api/artists", "") // fresh fetch
+	w := doRequest(h, http.MethodGet, "/api/v1/artists", "") // fresh fetch
 	var artists []subsonic.Artist
 	decodeJSON(t, w.Body, &artists)
 	if len(artists) != 1 || artists[0].ID != "a2" {
@@ -735,7 +735,7 @@ func TestHandleArtists_CacheCleared(t *testing.T) {
 func TestHandleArtist(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.artist = &subsonic.Artist{ID: "a1", Name: "Artist"}
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/artist/a1", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/artist/a1", "")
 	assertOK(t, w)
 	var a subsonic.Artist
 	decodeJSON(t, w.Body, &a)
@@ -747,7 +747,7 @@ func TestHandleArtist(t *testing.T) {
 func TestHandleAlbum(t *testing.T) {
 	srv, _, fs := newTestServer(t)
 	fs.album = &subsonic.Album{ID: "alb1", Name: "Great Album"}
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/album/alb1", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/album/alb1", "")
 	assertOK(t, w)
 	var alb subsonic.Album
 	decodeJSON(t, w.Body, &alb)
@@ -761,7 +761,7 @@ func TestHandleSearch(t *testing.T) {
 	fs.searchResult = &subsonic.SearchResult{
 		Artists: []subsonic.Artist{{ID: "a1"}},
 	}
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/search?q=test", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/search?q=test", "")
 	assertOK(t, w)
 	var result subsonic.SearchResult
 	decodeJSON(t, w.Body, &result)
@@ -772,7 +772,7 @@ func TestHandleSearch(t *testing.T) {
 
 func TestHandleSearch_MissingQuery(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/search", "")
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/search", "")
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -792,7 +792,7 @@ func TestHandleCoverArt_ProxiesAndCaches(t *testing.T) {
 	h := srv.Handler()
 
 	// First request: fetches from upstream.
-	w1 := doRequest(h, http.MethodGet, "/api/coverart/cover1?size=300", "")
+	w1 := doRequest(h, http.MethodGet, "/api/v1/coverart/cover1?size=300", "")
 	assertOK(t, w1)
 	if ct := w1.Header().Get("Content-Type"); ct != "image/jpeg" {
 		t.Errorf("Content-Type: got %q, want image/jpeg", ct)
@@ -803,7 +803,7 @@ func TestHandleCoverArt_ProxiesAndCaches(t *testing.T) {
 
 	// Second request: served from cache (imgSrv can be closed now).
 	imgSrv.Close()
-	w2 := doRequest(h, http.MethodGet, "/api/coverart/cover1?size=300", "")
+	w2 := doRequest(h, http.MethodGet, "/api/v1/coverart/cover1?size=300", "")
 	assertOK(t, w2)
 	if w2.Body.String() != string(imgData) {
 		t.Error("expected cached cover art on second request")
@@ -819,7 +819,7 @@ func TestHandleCoverArt_DefaultSize(t *testing.T) {
 
 	srv, _, fs := newTestServer(t)
 	fs.coverArtURL = imgSrv.URL + "/cover.png"
-	w := doRequest(srv.Handler(), http.MethodGet, "/api/coverart/x", "") // no size param
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/coverart/x", "") // no size param
 	assertOK(t, w)
 }
 
@@ -827,7 +827,7 @@ func TestHandleCoverArt_DefaultSize(t *testing.T) {
 
 func TestHandleClearCache(t *testing.T) {
 	srv, _, _ := newTestServer(t)
-	w := doRequest(srv.Handler(), http.MethodDelete, "/api/cache", "")
+	w := doRequest(srv.Handler(), http.MethodDelete, "/api/v1/cache", "")
 	assertOK(t, w)
 }
 
@@ -989,9 +989,9 @@ func TestModeFrontend_APIAndWSRoutesReturn404(t *testing.T) {
 	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend}, testFS, nil)
 	h := srv.Handler()
 	for _, tc := range []struct{ method, path string }{
-		{http.MethodGet, "/api/state"},
-		{http.MethodGet, "/api/artists"},
-		{http.MethodPost, "/api/playpause"},
+		{http.MethodGet, "/api/v1/state"},
+		{http.MethodGet, "/api/v1/artists"},
+		{http.MethodPost, "/api/v1/playpause"},
 		{http.MethodGet, "/ws"},
 	} {
 		w := doRequest(h, tc.method, tc.path, "")
@@ -1093,7 +1093,7 @@ func TestEnqueueSong_TrackConversion(t *testing.T) {
 		SamplingRate: 44100,
 		ChannelCount: 2,
 	}
-	doRequest(srv.Handler(), http.MethodPost, "/api/queue/song/s1", "")
+	doRequest(srv.Handler(), http.MethodPost, "/api/v1/queue/song/s1", "")
 	fp.mu.Lock()
 	added := fp.addedTracks
 	fp.mu.Unlock()
@@ -1104,7 +1104,7 @@ func TestEnqueueSong_TrackConversion(t *testing.T) {
 	if tr.ID != "s1" || tr.Title != "My Song" || tr.Artist != "Me" {
 		t.Errorf("unexpected track fields: %+v", tr)
 	}
-	if tr.CoverArt != "/api/coverart/cover1" {
+	if tr.CoverArt != "/api/v1/coverart/cover1" {
 		t.Errorf("CoverArt: got %q, want /api/coverart/cover1", tr.CoverArt)
 	}
 	if tr.Suffix != "flac" || tr.BitRate != 1000 || tr.SamplingRate != 44100 || tr.ChannelCount != 2 {

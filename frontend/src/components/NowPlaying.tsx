@@ -139,7 +139,7 @@ function AudioDevicePopover({
 								current === d.id ? 'text-brand' : 'text-text'
 							)}
 							onClick={() => {
-								apiFetch(`/api/satellites/${encodeURIComponent(activeSatelliteName)}/device`, {
+								apiFetch(`/api/v1/satellites/${encodeURIComponent(activeSatelliteName)}/device`, {
 									method: 'POST',
 									headers: { 'Content-Type': 'application/json' },
 									body: JSON.stringify({ device: d.id })
@@ -250,7 +250,7 @@ export function NowPlaying({
 	}, [activeSatellite]);
 
 	const handleSelectSatellite = useCallback((name: string) => {
-		apiFetch('/api/satellites/active', {
+		apiFetch('/api/v1/satellites/active', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name })

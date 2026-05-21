@@ -100,7 +100,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.playPause();
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/playpause', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/playpause', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('next calls POST /api/next', async () => {
@@ -108,7 +108,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.next();
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/next', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/next', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('prev calls POST /api/prev', async () => {
@@ -116,7 +116,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.prev();
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/prev', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/prev', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('shuffle calls POST /api/shuffle', async () => {
@@ -124,7 +124,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.shuffle();
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/shuffle', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/shuffle', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('repeat calls POST /api/repeat', async () => {
@@ -132,7 +132,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.repeat();
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/repeat', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/repeat', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('setVolume calls POST /api/volume with body', async () => {
@@ -141,7 +141,7 @@ describe('usePlayer — controls', () => {
 			result.current.controls.setVolume(75);
 		});
 		expect(mockFetch).toHaveBeenCalledWith(
-			'/api/volume',
+			'/api/v1/volume',
 			expect.objectContaining({ method: 'POST', body: JSON.stringify({ volume: 75 }) })
 		);
 	});
@@ -151,7 +151,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.clearQueue();
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/queue', expect.objectContaining({ method: 'DELETE' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/queue', expect.objectContaining({ method: 'DELETE' }));
 	});
 
 	it('removeTrack calls DELETE /api/queue/{idx}', async () => {
@@ -159,7 +159,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.removeTrack(3);
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/queue/3', expect.objectContaining({ method: 'DELETE' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/queue/3', expect.objectContaining({ method: 'DELETE' }));
 	});
 
 	it('moveTrack calls POST /api/queue/move with from/to', async () => {
@@ -168,7 +168,7 @@ describe('usePlayer — controls', () => {
 			result.current.controls.moveTrack(1, 4);
 		});
 		expect(mockFetch).toHaveBeenCalledWith(
-			'/api/queue/move',
+			'/api/v1/queue/move',
 			expect.objectContaining({ body: JSON.stringify({ from: 1, to: 4 }) })
 		);
 	});
@@ -178,7 +178,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.jumpTo(2);
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/queue/jump/2', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/queue/jump/2', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('playSong calls POST /api/play/song/{id}', async () => {
@@ -186,7 +186,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.playSong('song42');
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/play/song/song42', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/play/song/song42', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('playAlbum calls POST /api/play/album/{id}', async () => {
@@ -194,7 +194,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.playAlbum('alb7');
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/play/album/alb7', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/play/album/alb7', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('enqueueSong calls POST /api/queue/song/{id}', async () => {
@@ -202,7 +202,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.enqueueSong('s1');
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/queue/song/s1', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/queue/song/s1', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('enqueueAlbum calls POST /api/queue/album/{id}', async () => {
@@ -210,7 +210,7 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.enqueueAlbum('alb2');
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/queue/album/alb2', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/queue/album/alb2', expect.objectContaining({ method: 'POST' }));
 	});
 
 	it('playPlaylist calls POST /api/play/playlist/{id}', async () => {
@@ -218,7 +218,10 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.playPlaylist('pl1');
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/play/playlist/pl1', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith(
+			'/api/v1/play/playlist/pl1',
+			expect.objectContaining({ method: 'POST' })
+		);
 	});
 
 	it('enqueuePlaylist calls POST /api/queue/playlist/{id}', async () => {
@@ -226,7 +229,10 @@ describe('usePlayer — controls', () => {
 		await act(async () => {
 			result.current.controls.enqueuePlaylist('pl2');
 		});
-		expect(mockFetch).toHaveBeenCalledWith('/api/queue/playlist/pl2', expect.objectContaining({ method: 'POST' }));
+		expect(mockFetch).toHaveBeenCalledWith(
+			'/api/v1/queue/playlist/pl2',
+			expect.objectContaining({ method: 'POST' })
+		);
 	});
 });
 
@@ -249,7 +255,7 @@ describe('usePlayer — seek debounce', () => {
 
 		expect(mockFetch).toHaveBeenCalledTimes(1);
 		expect(mockFetch).toHaveBeenCalledWith(
-			'/api/seek',
+			'/api/v1/seek',
 			expect.objectContaining({ body: JSON.stringify({ position: 30 }) })
 		);
 
@@ -271,7 +277,7 @@ describe('usePlayer — seek debounce', () => {
 		});
 
 		expect(mockFetch).toHaveBeenCalledWith(
-			'/api/seek',
+			'/api/v1/seek',
 			expect.objectContaining({ body: JSON.stringify({ position: 55 }) })
 		);
 

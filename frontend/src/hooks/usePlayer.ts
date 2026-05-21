@@ -72,26 +72,26 @@ export function usePlayer(): {
 
 	const controls = useMemo<PlayerControls>(
 		() => ({
-			playPause: () => api('POST', '/api/playpause'),
-			next: () => api('POST', '/api/next'),
-			prev: () => api('POST', '/api/prev'),
-			shuffle: () => api('POST', '/api/shuffle'),
-			repeat: () => api('POST', '/api/repeat'),
+			playPause: () => api('POST', '/api/v1/playpause'),
+			next: () => api('POST', '/api/v1/next'),
+			prev: () => api('POST', '/api/v1/prev'),
+			shuffle: () => api('POST', '/api/v1/shuffle'),
+			repeat: () => api('POST', '/api/v1/repeat'),
 			seek: (pos) => {
 				if (seekTimer.current) clearTimeout(seekTimer.current);
-				seekTimer.current = setTimeout(() => api('POST', '/api/seek', { position: pos }), 150);
+				seekTimer.current = setTimeout(() => api('POST', '/api/v1/seek', { position: pos }), 150);
 			},
-			setVolume: (vol) => api('POST', '/api/volume', { volume: vol }),
-			clearQueue: () => api('DELETE', '/api/queue'),
-			removeTrack: (idx) => api('DELETE', `/api/queue/${idx}`),
-			moveTrack: (from, to) => api('POST', '/api/queue/move', { from, to }),
-			jumpTo: (idx) => api('POST', `/api/queue/jump/${idx}`),
-			playSong: (id) => api('POST', `/api/play/song/${id}`),
-			playAlbum: (id) => api('POST', `/api/play/album/${id}`),
-			enqueueSong: (id) => api('POST', `/api/queue/song/${id}`),
-			enqueueAlbum: (id) => api('POST', `/api/queue/album/${id}`),
-			playPlaylist: (id) => api('POST', `/api/play/playlist/${id}`),
-			enqueuePlaylist: (id) => api('POST', `/api/queue/playlist/${id}`)
+			setVolume: (vol) => api('POST', '/api/v1/volume', { volume: vol }),
+			clearQueue: () => api('DELETE', '/api/v1/queue'),
+			removeTrack: (idx) => api('DELETE', `/api/v1/queue/${idx}`),
+			moveTrack: (from, to) => api('POST', '/api/v1/queue/move', { from, to }),
+			jumpTo: (idx) => api('POST', `/api/v1/queue/jump/${idx}`),
+			playSong: (id) => api('POST', `/api/v1/play/song/${id}`),
+			playAlbum: (id) => api('POST', `/api/v1/play/album/${id}`),
+			enqueueSong: (id) => api('POST', `/api/v1/queue/song/${id}`),
+			enqueueAlbum: (id) => api('POST', `/api/v1/queue/album/${id}`),
+			playPlaylist: (id) => api('POST', `/api/v1/play/playlist/${id}`),
+			enqueuePlaylist: (id) => api('POST', `/api/v1/queue/playlist/${id}`)
 		}),
 		[]
 	);

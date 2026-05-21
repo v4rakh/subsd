@@ -38,7 +38,7 @@ describe('useLibrary — loadArtists', () => {
 			await result.current.loadArtists();
 		});
 
-		expect(mockFetch).toHaveBeenCalledWith('/api/artists');
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/artists');
 		expect(result.current.artists).toEqual(artists);
 	});
 
@@ -98,7 +98,7 @@ describe('useLibrary — selectArtist', () => {
 			await result.current.selectArtist(artist);
 		});
 
-		expect(mockFetch).toHaveBeenCalledWith('/api/artist/a1');
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/artist/a1');
 		expect(result.current.selectedArtist).toEqual(artist);
 		expect(result.current.albums).toHaveLength(2);
 		expect(result.current.albums[0].id).toBe('alb1');
@@ -172,7 +172,7 @@ describe('useLibrary — selectAlbum', () => {
 			await result.current.selectAlbum(album);
 		});
 
-		expect(mockFetch).toHaveBeenCalledWith('/api/album/alb1');
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/album/alb1');
 		expect(result.current.selectedAlbum).toEqual(album);
 		expect(result.current.songs).toHaveLength(2);
 		expect(result.current.songs[0].id).toBe('s1');
@@ -192,7 +192,7 @@ describe('useLibrary — loadPlaylists', () => {
 			await result.current.loadPlaylists();
 		});
 
-		expect(mockFetch).toHaveBeenCalledWith('/api/playlists');
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/playlists');
 		expect(result.current.playlists).toEqual(playlists);
 	});
 });
@@ -224,7 +224,7 @@ describe('useLibrary — selectPlaylist', () => {
 			await result.current.selectPlaylist(playlist);
 		});
 
-		expect(mockFetch).toHaveBeenCalledWith('/api/playlist/p1');
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/playlist/p1');
 		expect(result.current.selectedPlaylist).toEqual(playlist);
 		expect(result.current.playlistSongs).toHaveLength(1);
 	});

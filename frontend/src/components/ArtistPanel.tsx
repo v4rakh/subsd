@@ -33,7 +33,7 @@ export function ArtistPanel({ artists, selectedArtist, loading, onSelect, classN
 							{a.coverArt ? (
 								<img
 									className="w-10 h-10 rounded object-cover shrink-0"
-									src={apiUrl(`/api/coverart/${a.coverArt}`)}
+									src={apiUrl(`/api/v1/coverart/${a.coverArt}`)}
 									alt=""
 									loading="lazy"
 									onError={(e) => {

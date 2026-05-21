@@ -51,7 +51,7 @@ export function useLibrary(): LibraryState & LibraryActions {
 	const loadArtists = useCallback(async () => {
 		setLoading((l) => ({ ...l, artists: true }));
 		try {
-			const r = await apiFetch('/api/artists');
+			const r = await apiFetch('/api/v1/artists');
 			setArtists((await r.json()) ?? []);
 		} finally {
 			setLoading((l) => ({ ...l, artists: false }));
@@ -64,7 +64,7 @@ export function useLibrary(): LibraryState & LibraryActions {
 		setSongs([]);
 		setLoading((l) => ({ ...l, albums: true }));
 		try {
-			const r = await apiFetch(`/api/artist/${artist.id}`);
+			const r = await apiFetch(`/api/v1/artist/${artist.id}`);
 			const data: Artist = await r.json();
 			setAlbums(data.album ?? []);
 		} finally {
@@ -76,7 +76,7 @@ export function useLibrary(): LibraryState & LibraryActions {
 		setSelectedAlbum(album);
 		setLoading((l) => ({ ...l, tracks: true }));
 		try {
-			const r = await apiFetch(`/api/album/${album.id}`);
+			const r = await apiFetch(`/api/v1/album/${album.id}`);
 			const data: Album = await r.json();
 			setSongs(data.song ?? []);
 		} finally {
@@ -87,7 +87,7 @@ export function useLibrary(): LibraryState & LibraryActions {
 	const loadPlaylists = useCallback(async () => {
 		setLoading((l) => ({ ...l, playlists: true }));
 		try {
-			const r = await apiFetch('/api/playlists');
+			const r = await apiFetch('/api/v1/playlists');
 			setPlaylists((await r.json()) ?? []);
 		} finally {
 			setLoading((l) => ({ ...l, playlists: false }));
@@ -99,7 +99,7 @@ export function useLibrary(): LibraryState & LibraryActions {
 		setPlaylistSongs([]);
 		setLoading((l) => ({ ...l, playlistTracks: true }));
 		try {
-			const r = await apiFetch(`/api/playlist/${playlist.id}`);
+			const r = await apiFetch(`/api/v1/playlist/${playlist.id}`);
 			const data: Playlist = await r.json();
 			setPlaylistSongs(data.entry ?? []);
 		} finally {

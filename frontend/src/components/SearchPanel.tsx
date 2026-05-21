@@ -31,7 +31,7 @@ function ArtistRow({ artist, onSelect }: { artist: Artist; onSelect: (a: Artist)
 			{artist.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
-					src={apiUrl(`/api/coverart/${artist.coverArt}`)}
+					src={apiUrl(`/api/v1/coverart/${artist.coverArt}`)}
 					alt=""
 					loading="lazy"
 					onError={(e) => {
@@ -74,7 +74,7 @@ function AlbumRow({
 			{album.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
-					src={apiUrl(`/api/coverart/${album.coverArt}`)}
+					src={apiUrl(`/api/v1/coverart/${album.coverArt}`)}
 					alt=""
 					loading="lazy"
 					onError={(e) => {
@@ -186,7 +186,7 @@ export function SearchPanel({
 			abortRef.current = controller;
 			setLoading(true);
 			try {
-				const r = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`, {
+				const r = await apiFetch(`/api/v1/search?q=${encodeURIComponent(query)}`, {
 					signal: controller.signal
 				});
 				setResults(await r.json());

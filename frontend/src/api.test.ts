@@ -14,9 +14,9 @@ describe('apiFetch', () => {
 		vi.stubGlobal('fetch', mockFetch);
 
 		const { apiFetch } = await import('./api');
-		await apiFetch('/api/state');
+		await apiFetch('/api/v1/state');
 
-		expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/api/state', { credentials: 'include' });
+		expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/api/v1/state', { credentials: 'include' });
 	});
 
 	it('uses the path as-is when apiUrl is empty', async () => {
@@ -25,9 +25,9 @@ describe('apiFetch', () => {
 		vi.stubGlobal('fetch', mockFetch);
 
 		const { apiFetch } = await import('./api');
-		await apiFetch('/api/state');
+		await apiFetch('/api/v1/state');
 
-		expect(mockFetch).toHaveBeenCalledWith('/api/state', { credentials: 'include' });
+		expect(mockFetch).toHaveBeenCalledWith('/api/v1/state', { credentials: 'include' });
 	});
 
 	it('dispatches AUTH_FAILURE_EVENT and throws on 401', async () => {
@@ -36,7 +36,7 @@ describe('apiFetch', () => {
 		const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
 		const { apiFetch, AUTH_FAILURE_EVENT } = await import('./api');
-		await expect(apiFetch('/api/state')).rejects.toThrow('unauthorized');
+		await expect(apiFetch('/api/v1/state')).rejects.toThrow('unauthorized');
 		expect(dispatchSpy).toHaveBeenCalledWith(
 			expect.objectContaining({ type: AUTH_FAILURE_EVENT })
 		);
@@ -48,7 +48,7 @@ describe('apiFetch', () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
 
 		const { apiFetch } = await import('./api');
-		const result = await apiFetch('/api/artists');
+		const result = await apiFetch('/api/v1/artists');
 
 		expect(result).toBe(response);
 	});

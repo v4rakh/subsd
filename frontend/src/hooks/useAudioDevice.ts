@@ -11,7 +11,7 @@ export function useAudioDevice() {
 	const [current, setCurrent] = useState<string>('');
 
 	useEffect(() => {
-		apiFetch('/api/devices')
+		apiFetch('/api/v1/devices')
 			.then((r) => r.json())
 			.then((body: { devices: AudioDevice[]; current: string }) => {
 				setDevices(body.devices ?? []);
@@ -22,7 +22,7 @@ export function useAudioDevice() {
 
 	const setDevice = useCallback((name: string) => {
 		setCurrent(name);
-		apiFetch('/api/device', {
+		apiFetch('/api/v1/device', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name })
