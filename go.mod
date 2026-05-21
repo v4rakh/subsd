@@ -3,6 +3,7 @@ module varakh.de/subsd
 go 1.25.0
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gorilla/websocket v1.5.3
 	github.com/rs/zerolog v1.35.1

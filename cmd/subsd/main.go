@@ -148,6 +148,7 @@ func main() {
 				Flags:  serveFlags,
 				Action: serveAction,
 			},
+			remoteCommand,
 		},
 	}
 
