@@ -33,11 +33,12 @@ in
       description = "System group to run subsd as.";
     };
 
-    # --- Required ---
+    # --- Required (except in frontend mode) ---
     host = lib.mkOption {
-      type = lib.types.str;
+      type = lib.types.nullOr lib.types.str;
+      default = null;
       example = "http://192.168.1.10:4533";
-      description = "Navidrome/Subsonic server URL (SUBSD_HOST).";
+      description = "Navidrome/Subsonic server URL (SUBSD_HOST). Required unless mode is frontend.";
     };
 
     subsonicUser = lib.mkOption {
@@ -65,6 +66,25 @@ in
     };
 
     # --- Optional ---
+    mode = lib.mkOption {
+      type = lib.types.nullOr (
+        lib.types.enum [
+          "full"
+          "daemon"
+          "frontend"
+        ]
+      );
+      default = null;
+      description = "Operating mode (SUBSD_MODE): full (API + frontend), daemon (API only), frontend (UI only). Defaults to full when unset.";
+    };
+
+    url = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "https://subsd.internal:8080";
+      description = "Base URL of the API server (SUBSD_URL). Required when mode is frontend.";
+    };
+
     addr = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -128,21 +148,41 @@ in
       example = "60s";
       description = "HTTP server read timeout (SUBSD_READ_TIMEOUT). Defaults to 60s when unset.";
     };
+
+    corsOrigins = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "https://ui.example.com";
+      description = "Comma-separated allowed CORS origins (SUBSD_CORS_ORIGINS); use * for any. Defaults to * when unset.";
+    };
+
+    cookieSameSite = lib.mkOption {
+      type = lib.types.nullOr (
+        lib.types.enum [
+          "strict"
+          "lax"
+          "none"
+        ]
+      );
+      default = null;
+      description = "SameSite policy for the session cookie (SUBSD_COOKIE_SAMESITE). Use none for cross-origin daemon/frontend split — requires HTTPS (browsers reject none without Secure). Defaults to strict when unset.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = cfg.subsonicUser != null || cfg.subsonicUserFile != null;
-        message = "services.subsd: either subsonicUser or subsonicUserFile must be set.";
+        assertion = cfg.mode == "frontend" || cfg.subsonicUser != null || cfg.subsonicUserFile != null;
+        message = "services.subsd: either subsonicUser or subsonicUserFile must be set (not required in frontend mode).";
       }
       {
         assertion = !(cfg.subsonicUser != null && cfg.subsonicUserFile != null);
         message = "services.subsd: subsonicUser and subsonicUserFile are mutually exclusive.";
       }
       {
-        assertion = cfg.subsonicPassword != null || cfg.subsonicPasswordFile != null;
-        message = "services.subsd: either subsonicPassword or subsonicPasswordFile must be set.";
+        assertion =
+          cfg.mode == "frontend" || cfg.subsonicPassword != null || cfg.subsonicPasswordFile != null;
+        message = "services.subsd: either subsonicPassword or subsonicPasswordFile must be set (not required in frontend mode).";
       }
       {
         assertion = !(cfg.subsonicPassword != null && cfg.subsonicPasswordFile != null);
@@ -151,6 +191,14 @@ in
       {
         assertion = !(cfg.token != null && cfg.tokenFile != null);
         message = "services.subsd: token and tokenFile are mutually exclusive.";
+      }
+      {
+        assertion = cfg.mode == "frontend" || cfg.host != null;
+        message = "services.subsd: host must be set when mode is not frontend.";
+      }
+      {
+        assertion = cfg.mode != "frontend" || cfg.url != null;
+        message = "services.subsd: url must be set when mode is frontend.";
       }
     ];
 
@@ -171,28 +219,31 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
 
-      environment = {
-        SUBSD_HOST = cfg.host;
-      }
-      // lib.optionalAttrs (cfg.subsonicUser != null) { SUBSD_USER = cfg.subsonicUser; }
-      // lib.optionalAttrs (cfg.subsonicUserFile != null) {
-        SUBSD_USER_FILE = toString cfg.subsonicUserFile;
-      }
-      // lib.optionalAttrs (cfg.subsonicPassword != null) { SUBSD_PASS = cfg.subsonicPassword; }
-      // lib.optionalAttrs (cfg.subsonicPasswordFile != null) {
-        SUBSD_PASS_FILE = toString cfg.subsonicPasswordFile;
-      }
-      // lib.optionalAttrs (cfg.addr != null) { SUBSD_ADDR = cfg.addr; }
-      // lib.optionalAttrs (cfg.token != null) { SUBSD_TOKEN = cfg.token; }
-      // lib.optionalAttrs (cfg.tokenFile != null) { SUBSD_TOKEN_FILE = toString cfg.tokenFile; }
-      // lib.optionalAttrs (cfg.tlsCert != null) { SUBSD_TLS_CERT = toString cfg.tlsCert; }
-      // lib.optionalAttrs (cfg.tlsKey != null) { SUBSD_TLS_KEY = toString cfg.tlsKey; }
-      // lib.optionalAttrs (cfg.mpvSocket != null) { SUBSD_MPV_SOCKET = cfg.mpvSocket; }
-      // lib.optionalAttrs (cfg.logLevel != null) { SUBSD_LOG_LEVEL = cfg.logLevel; }
-      // {
-        SUBSD_STATE_FILE = if cfg.stateFile != null then cfg.stateFile else "/var/lib/subsd/state.json";
-      }
-      // lib.optionalAttrs (cfg.readTimeout != null) { SUBSD_READ_TIMEOUT = cfg.readTimeout; };
+      environment =
+        lib.optionalAttrs (cfg.mode != null) { SUBSD_MODE = cfg.mode; }
+        // lib.optionalAttrs (cfg.url != null) { SUBSD_URL = cfg.url; }
+        // lib.optionalAttrs (cfg.host != null) { SUBSD_HOST = cfg.host; }
+        // lib.optionalAttrs (cfg.subsonicUser != null) { SUBSD_USER = cfg.subsonicUser; }
+        // lib.optionalAttrs (cfg.subsonicUserFile != null) {
+          SUBSD_USER_FILE = toString cfg.subsonicUserFile;
+        }
+        // lib.optionalAttrs (cfg.subsonicPassword != null) { SUBSD_PASS = cfg.subsonicPassword; }
+        // lib.optionalAttrs (cfg.subsonicPasswordFile != null) {
+          SUBSD_PASS_FILE = toString cfg.subsonicPasswordFile;
+        }
+        // lib.optionalAttrs (cfg.addr != null) { SUBSD_ADDR = cfg.addr; }
+        // lib.optionalAttrs (cfg.token != null) { SUBSD_TOKEN = cfg.token; }
+        // lib.optionalAttrs (cfg.tokenFile != null) { SUBSD_TOKEN_FILE = toString cfg.tokenFile; }
+        // lib.optionalAttrs (cfg.tlsCert != null) { SUBSD_TLS_CERT = toString cfg.tlsCert; }
+        // lib.optionalAttrs (cfg.tlsKey != null) { SUBSD_TLS_KEY = toString cfg.tlsKey; }
+        // lib.optionalAttrs (cfg.mpvSocket != null) { SUBSD_MPV_SOCKET = cfg.mpvSocket; }
+        // lib.optionalAttrs (cfg.logLevel != null) { SUBSD_LOG_LEVEL = cfg.logLevel; }
+        // {
+          SUBSD_STATE_FILE = if cfg.stateFile != null then cfg.stateFile else "/var/lib/subsd/state.json";
+        }
+        // lib.optionalAttrs (cfg.readTimeout != null) { SUBSD_READ_TIMEOUT = cfg.readTimeout; }
+        // lib.optionalAttrs (cfg.corsOrigins != null) { SUBSD_CORS_ORIGINS = cfg.corsOrigins; }
+        // lib.optionalAttrs (cfg.cookieSameSite != null) { SUBSD_COOKIE_SAMESITE = cfg.cookieSameSite; };
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/subsd";

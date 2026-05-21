@@ -1,4 +1,5 @@
 import { PanelList, ListItem, EmptyState, SkeletonList } from './Panel';
+import { apiUrl } from '../api';
 import type { Playlist, Song } from '../types';
 import { fmtDuration, fmtAudioMeta } from '@/lib/format';
 import { Play, PlusIcon } from 'lucide-react';
@@ -37,7 +38,7 @@ function PlaylistRow({
 			{playlist.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
-					src={`/api/coverart/${playlist.coverArt}`}
+					src={apiUrl(`/api/coverart/${playlist.coverArt}`)}
 					alt=""
 					loading="lazy"
 					onError={(e) => {

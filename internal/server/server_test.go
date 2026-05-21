@@ -860,6 +860,223 @@ func TestNew_ScrobbleError_SetsLastScrobble(t *testing.T) {
 	}
 }
 
+// ── /config.json ─────────────────────────────────────────────────────────────
+
+func TestConfig_EmptyURL(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodGet, "/config.json", "")
+	assertOK(t, w)
+	var cfg map[string]string
+	decodeJSON(t, w.Body, &cfg)
+	if cfg["url"] != "" {
+		t.Errorf("url: got %q, want empty", cfg["url"])
+	}
+}
+
+func TestConfig_SetURL(t *testing.T) {
+	fp := &fakePlayer{}
+	fss := &fakeSubsonic{}
+	srv := server.New(fss, fp, server.Config{URL: "https://api.example.com"}, testFS)
+	w := doRequest(srv.Handler(), http.MethodGet, "/config.json", "")
+	assertOK(t, w)
+	var cfg map[string]string
+	decodeJSON(t, w.Body, &cfg)
+	if cfg["url"] != "https://api.example.com" {
+		t.Errorf("url: got %q, want https://api.example.com", cfg["url"])
+	}
+}
+
+func TestConfig_PublicWhenTokenAuthEnabled(t *testing.T) {
+	srv, _, _ := newTestServerWithToken(t, "secret")
+	// No auth cookie — /config.json must still be accessible.
+	w := doRequest(srv.Handler(), http.MethodGet, "/config.json", "")
+	assertOK(t, w)
+}
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
+
+func newCORSServer(t *testing.T, origins string) *server.Server {
+	t.Helper()
+	return server.New(&fakeSubsonic{}, &fakePlayer{}, server.Config{CORSOrigins: origins}, testFS)
+}
+
+func doRequestWithOrigin(h http.Handler, method, path, origin string) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(method, path, nil)
+	r.Header.Set("Origin", origin)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return w
+}
+
+func TestCORS_MatchedOrigin_AddsHeaders(t *testing.T) {
+	srv := newCORSServer(t, "https://ui.example.com")
+	w := doRequestWithOrigin(srv.Handler(), http.MethodGet, "/config.json", "https://ui.example.com")
+	assertOK(t, w)
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://ui.example.com" {
+		t.Errorf("ACAO: got %q, want https://ui.example.com", got)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Errorf("ACAC: got %q, want true", got)
+	}
+	if got := w.Header().Get("Vary"); !strings.Contains(got, "Origin") {
+		t.Errorf("Vary: got %q, want to contain Origin", got)
+	}
+}
+
+func TestCORS_Wildcard_ReflectsOrigin(t *testing.T) {
+	srv := newCORSServer(t, "*")
+	w := doRequestWithOrigin(srv.Handler(), http.MethodGet, "/config.json", "https://any.origin.com")
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://any.origin.com" {
+		t.Errorf("ACAO: got %q, want reflected origin, not literal *", got)
+	}
+}
+
+func TestCORS_UnmatchedOrigin_NoHeaders(t *testing.T) {
+	srv := newCORSServer(t, "https://ui.example.com")
+	w := doRequestWithOrigin(srv.Handler(), http.MethodGet, "/config.json", "https://other.example.com")
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("ACAO: got %q, want empty for unmatched origin", got)
+	}
+}
+
+func TestCORS_Preflight_Returns204WithHeaders(t *testing.T) {
+	srv := newCORSServer(t, "https://ui.example.com")
+	r := httptest.NewRequest(http.MethodOptions, "/config.json", nil)
+	r.Header.Set("Origin", "https://ui.example.com")
+	r.Header.Set("Access-Control-Request-Method", "GET")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	assertStatus(t, w, http.StatusNoContent)
+	if got := w.Header().Get("Access-Control-Allow-Methods"); got == "" {
+		t.Error("expected Access-Control-Allow-Methods on preflight response")
+	}
+}
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+
+func TestParseMode(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		want  server.Mode
+		isErr bool
+	}{
+		{"full", server.ModeFull, false},
+		{"", server.ModeFull, false},
+		{"daemon", server.ModeDaemon, false},
+		{"frontend", server.ModeFrontend, false},
+		{"FULL", server.ModeFull, false},
+		{"DAEMON", server.ModeDaemon, false},
+		{"FRONTEND", server.ModeFrontend, false},
+		{"unknown", 0, true},
+	} {
+		got, err := server.ParseMode(tc.input)
+		if tc.isErr {
+			if err == nil {
+				t.Errorf("ParseMode(%q): expected error, got nil", tc.input)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("ParseMode(%q): unexpected error: %v", tc.input, err)
+			}
+			if got != tc.want {
+				t.Errorf("ParseMode(%q): got %v, want %v", tc.input, got, tc.want)
+			}
+		}
+	}
+}
+
+func TestModeFrontend_APIAndWSRoutesReturn404(t *testing.T) {
+	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend}, testFS)
+	h := srv.Handler()
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/state"},
+		{http.MethodGet, "/api/artists"},
+		{http.MethodPost, "/api/playpause"},
+		{http.MethodGet, "/ws"},
+	} {
+		w := doRequest(h, tc.method, tc.path, "")
+		if w.Code == http.StatusOK {
+			t.Errorf("%s %s: expected non-200 in ModeFrontend, got 200", tc.method, tc.path)
+		}
+	}
+}
+
+func TestModeFrontend_ConfigStillAvailable(t *testing.T) {
+	srv := server.New(nil, nil, server.Config{Mode: server.ModeFrontend, URL: "https://api.internal"}, testFS)
+	w := doRequest(srv.Handler(), http.MethodGet, "/config.json", "")
+	assertOK(t, w)
+	var cfg map[string]string
+	decodeJSON(t, w.Body, &cfg)
+	if cfg["url"] != "https://api.internal" {
+		t.Errorf("url: got %q, want https://api.internal", cfg["url"])
+	}
+}
+
+func TestModeDaemon_StaticFilesReturn404(t *testing.T) {
+	srv := server.New(&fakeSubsonic{}, &fakePlayer{}, server.Config{Mode: server.ModeDaemon}, testFS)
+	w := doRequest(srv.Handler(), http.MethodGet, "/index.html", "")
+	assertStatus(t, w, http.StatusNotFound)
+}
+
+func TestSPAFallback_UnknownPathServesIndexHTML(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	// /login does not exist as a static file; the SPA handler must serve index.html.
+	w := doRequest(srv.Handler(), http.MethodGet, "/login", "")
+	assertOK(t, w)
+	if body := w.Body.String(); body != "<html></html>" {
+		t.Errorf("expected index.html content, got %q", body)
+	}
+}
+
+func TestSPAFallback_ExistingFileServedDirectly(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	// Request / rather than /index.html — the file server redirects /index.html
+	// to / (stdlib behaviour), so / is the canonical path for the root document.
+	w := doRequest(srv.Handler(), http.MethodGet, "/", "")
+	assertOK(t, w)
+}
+
+// ── SameSite cookie ───────────────────────────────────────────────────────────
+
+func TestLogin_SameSiteNone_SetsSecureCookie(t *testing.T) {
+	fp := &fakePlayer{}
+	fss := &fakeSubsonic{}
+	srv := server.New(fss, fp, server.Config{Token: "tok", CookieSameSite: http.SameSiteNoneMode}, testFS)
+	r := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=tok"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	assertStatus(t, w, http.StatusNoContent)
+	var found bool
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "subsd_token" {
+			found = true
+			if !c.Secure {
+				t.Error("expected Secure=true for SameSite=None cookie")
+			}
+		}
+	}
+	if !found {
+		t.Error("subsd_token cookie not set")
+	}
+}
+
+func TestLogin_SameSiteLax_NotSecure(t *testing.T) {
+	fp := &fakePlayer{}
+	fss := &fakeSubsonic{}
+	srv := server.New(fss, fp, server.Config{Token: "tok", CookieSameSite: http.SameSiteLaxMode}, testFS)
+	r := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=tok"))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, r)
+	assertStatus(t, w, http.StatusNoContent)
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "subsd_token" && c.Secure {
+			t.Error("expected Secure=false for SameSite=Lax cookie")
+		}
+	}
+}
+
 // ── toTrack conversion ────────────────────────────────────────────────────────
 
 func TestEnqueueSong_TrackConversion(t *testing.T) {
@@ -894,3 +1111,4 @@ func TestEnqueueSong_TrackConversion(t *testing.T) {
 		t.Errorf("audio metadata not forwarded: %+v", tr)
 	}
 }
+

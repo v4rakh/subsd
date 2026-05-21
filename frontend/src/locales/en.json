@@ -63,10 +63,10 @@
     "title": "Search"
   },
   "shortcuts": {
+    "blurInput": "Unfocus input",
     "nextTrack": "Next track",
     "playPause": "Play / Pause",
     "prevTrack": "Previous track",
-    "blurInput": "Unfocus input",
     "search": "Search",
     "showShortcuts": "Show shortcuts",
     "title": "Keyboard shortcuts",

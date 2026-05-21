@@ -103,26 +103,66 @@ func (c *wsClient) send(data []byte) error {
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
+// Mode controls which subsystems the server activates.
+type Mode int
+
+const (
+	// ModeFull runs the API, WebSocket hub, and embedded frontend (default).
+	ModeFull Mode = iota
+	// ModeDaemon runs the API and WebSocket hub only; no static files are served.
+	ModeDaemon
+	// ModeFrontend serves only the embedded frontend; all API/WS routes are absent.
+	ModeFrontend
+)
+
+// ParseMode converts a string ("full", "daemon", "frontend", or "") to a Mode.
+func ParseMode(s string) (Mode, error) {
+	switch strings.ToLower(s) {
+	case "full", "":
+		return ModeFull, nil
+	case "daemon":
+		return ModeDaemon, nil
+	case "frontend":
+		return ModeFrontend, nil
+	default:
+		return 0, fmt.Errorf("unknown mode %q: must be full, daemon, or frontend", s)
+	}
+}
+
+// ServesAPI reports whether the mode activates the API and WebSocket routes.
+func (m Mode) ServesAPI() bool { return m == ModeFull || m == ModeDaemon }
+
+// ServesFrontend reports whether the mode serves the embedded static frontend.
+func (m Mode) ServesFrontend() bool { return m == ModeFull || m == ModeFrontend }
+
 // Config holds the server's listen address and optional security settings.
 type Config struct {
-	Addr        string
-	Token       string        // if non-empty, require cookie auth
-	TLSCert     string        // path to TLS certificate file
-	TLSKey      string        // path to TLS private key file
-	ReadTimeout time.Duration // HTTP server read timeout
+	Mode           Mode // operating mode; zero value is ModeFull
+	Addr           string
+	Token          string        // if non-empty, require cookie auth
+	TLSCert        string        // path to TLS certificate file
+	TLSKey         string        // path to TLS private key file
+	ReadTimeout    time.Duration // HTTP server read timeout
+	URL            string        // returned in /config.json; used by frontend in UI-only mode
+	CORSOrigins    string        // comma-separated allowed origins; empty = CORS disabled
+	CookieSameSite http.SameSite // SameSite policy for the session cookie; zero defaults to Strict
 }
 
 // Server wires the Subsonic client, player, and WebSocket hub together.
 type Server struct {
-	client      SubsonicClient
-	httpClient  *http.Client
-	player      PlayerController
-	addr        string
-	token       string
-	tlsCert     string
-	tlsKey      string
-	readTimeout time.Duration
-	staticFS    fs.FS
+	client         SubsonicClient
+	httpClient     *http.Client
+	player         PlayerController
+	mode           Mode
+	addr           string
+	token          string
+	tlsCert        string
+	tlsKey         string
+	readTimeout    time.Duration
+	staticFS       fs.FS
+	url            string
+	corsOrigins    string
+	cookieSameSite http.SameSite
 
 	artists   cache.Cache[string, []subsonic.Artist]
 	artist    cache.Cache[string, *subsonic.Artist]
@@ -143,38 +183,48 @@ var upgrader = websocket.Upgrader{
 }
 
 // New creates a Server and registers player callbacks for state changes and
-// track completion (scrobbling).
+// track completion (scrobbling). client and p may be nil when cfg.Mode is ModeFrontend.
 func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS) *Server {
-	s := &Server{
-		client:      client,
-		httpClient:  &http.Client{Timeout: 15 * time.Second},
-		player:      p,
-		addr:        cfg.Addr,
-		token:       cfg.Token,
-		tlsCert:     cfg.TLSCert,
-		tlsKey:      cfg.TLSKey,
-		readTimeout: cfg.ReadTimeout,
-		staticFS:    staticFS,
-		artists:     cache.NewTTL[string, []subsonic.Artist](libraryCacheTTL),
-		artist:      cache.NewTTL[string, *subsonic.Artist](libraryCacheTTL),
-		album:       cache.NewTTL[string, *subsonic.Album](libraryCacheTTL),
-		coverArt:    cache.NewTTL[coverArtKey, coverArtEntry](coverArtCacheTTL),
-		playlists:   cache.NewTTL[string, []subsonic.Playlist](libraryCacheTTL),
-		playlist:    cache.NewTTL[string, *subsonic.Playlist](libraryCacheTTL),
-		clients:     make(map[*websocket.Conn]*wsClient),
+	cookieSameSite := cfg.CookieSameSite
+	if cookieSameSite == 0 {
+		cookieSameSite = http.SameSiteStrictMode
 	}
-	p.OnChange(func(state player.State) {
-		s.broadcast(state)
-	})
-	p.OnTrackEnd(func(t player.Track) {
-		if err := client.Scrobble(context.Background(), t.ID); err != nil {
-			log.Error().Err(err).Str("id", t.ID).Str("title", t.Title).Msg("server: scrobble failed")
-			p.SetLastScrobble("error")
-		} else {
-			log.Debug().Str("id", t.ID).Str("title", t.Title).Msg("server: scrobbled")
-			p.SetLastScrobble("ok")
-		}
-	})
+	s := &Server{
+		client:         client,
+		httpClient:     &http.Client{Timeout: 15 * time.Second},
+		player:         p,
+		mode:           cfg.Mode,
+		addr:           cfg.Addr,
+		token:          cfg.Token,
+		tlsCert:        cfg.TLSCert,
+		tlsKey:         cfg.TLSKey,
+		readTimeout:    cfg.ReadTimeout,
+		staticFS:       staticFS,
+		url:            cfg.URL,
+		corsOrigins:    cfg.CORSOrigins,
+		cookieSameSite: cookieSameSite,
+		artists:        cache.NewTTL[string, []subsonic.Artist](libraryCacheTTL),
+		artist:         cache.NewTTL[string, *subsonic.Artist](libraryCacheTTL),
+		album:          cache.NewTTL[string, *subsonic.Album](libraryCacheTTL),
+		coverArt:       cache.NewTTL[coverArtKey, coverArtEntry](coverArtCacheTTL),
+		playlists:      cache.NewTTL[string, []subsonic.Playlist](libraryCacheTTL),
+		playlist:       cache.NewTTL[string, *subsonic.Playlist](libraryCacheTTL),
+		clients:        make(map[*websocket.Conn]*wsClient),
+	}
+	if p != nil {
+		p.OnChange(func(state player.State) {
+			s.broadcast(state)
+		})
+		p.OnTrackEnd(func(t player.Track) {
+			if err := client.Scrobble(context.Background(), t.ID); err != nil {
+				log.Error().Err(err).Str("id", t.ID).Str("title", t.Title).Msg("server: scrobble failed")
+				p.SetLastScrobble("error")
+			} else {
+				log.Debug().Str("id", t.ID).Str("title", t.Title).Msg("server: scrobbled")
+				p.SetLastScrobble("ok")
+			}
+		})
+	}
 	return s
 }
 
@@ -184,60 +234,73 @@ func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(requestLogger)
 	r.Use(middleware.Recoverer)
+	if s.corsOrigins != "" {
+		r.Use(corsMiddleware(s.corsOrigins))
+	}
 	r.Use(s.authMiddleware)
 
-	// ── Login (public when token auth is enabled) ──────────────────────────
-	r.Post("/login", s.handleLoginPost)
+	// ── Runtime config (always public) ─────────────────────────────────────
+	r.Get("/config.json", s.handleConfig)
 
-	// ── WebSocket ──────────────────────────────────────────────────────────
-	r.Get("/ws", s.handleWS)
+	if s.mode.ServesAPI() {
+		// ── Login (public when token auth is enabled) ──────────────────────
+		r.Post("/login", s.handleLoginPost)
 
-	// ── Player controls ────────────────────────────────────────────────────
-	r.Post("/api/play", s.handlePlay)
-	r.Post("/api/pause", s.handlePause)
-	r.Post("/api/playpause", s.handlePlayPause)
-	r.Post("/api/next", s.handleNext)
-	r.Post("/api/prev", s.handlePrev)
-	r.Post("/api/seek", s.handleSeek)
-	r.Post("/api/volume", s.handleVolume)
-	r.Post("/api/shuffle", s.handleShuffle)
-	r.Post("/api/repeat", s.handleRepeat)
+		// ── WebSocket ─────────────────────────────────────────────────────
+		r.Get("/ws", s.handleWS)
 
-	// ── Queue ──────────────────────────────────────────────────────────────
-	r.Delete("/api/queue", s.handleClearQueue)
-	r.Delete("/api/queue/{idx}", s.handleDequeue)
-	r.Post("/api/queue/song/{id}", s.handleEnqueueSong)
-	r.Post("/api/queue/album/{id}", s.handleEnqueueAlbum)
-	r.Post("/api/queue/jump/{idx}", s.handleJump)
-	r.Post("/api/queue/move", s.handleMove)
-	r.Post("/api/play/song/{id}", s.handlePlaySong)
-	r.Post("/api/play/album/{id}", s.handlePlayAlbum)
+		// ── Player controls ───────────────────────────────────────────────
+		r.Post("/api/play", s.handlePlay)
+		r.Post("/api/pause", s.handlePause)
+		r.Post("/api/playpause", s.handlePlayPause)
+		r.Post("/api/next", s.handleNext)
+		r.Post("/api/prev", s.handlePrev)
+		r.Post("/api/seek", s.handleSeek)
+		r.Post("/api/volume", s.handleVolume)
+		r.Post("/api/shuffle", s.handleShuffle)
+		r.Post("/api/repeat", s.handleRepeat)
 
-	// ── Library ────────────────────────────────────────────────────────────
-	r.Get("/api/artists", s.handleArtists)
-	r.Get("/api/artist/{id}", s.handleArtist)
-	r.Get("/api/album/{id}", s.handleAlbum)
-	r.Get("/api/search", s.handleSearch)
-	r.Get("/api/coverart/{id}", s.handleCoverArt)
+		// ── Queue ─────────────────────────────────────────────────────────
+		r.Delete("/api/queue", s.handleClearQueue)
+		r.Delete("/api/queue/{idx}", s.handleDequeue)
+		r.Post("/api/queue/song/{id}", s.handleEnqueueSong)
+		r.Post("/api/queue/album/{id}", s.handleEnqueueAlbum)
+		r.Post("/api/queue/jump/{idx}", s.handleJump)
+		r.Post("/api/queue/move", s.handleMove)
+		r.Post("/api/play/song/{id}", s.handlePlaySong)
+		r.Post("/api/play/album/{id}", s.handlePlayAlbum)
 
-	// ── Playlists ──────────────────────────────────────────────────────────
-	r.Get("/api/playlists", s.handlePlaylists)
-	r.Get("/api/playlist/{id}", s.handlePlaylist)
-	r.Post("/api/play/playlist/{id}", s.handlePlayPlaylist)
-	r.Post("/api/queue/playlist/{id}", s.handleEnqueuePlaylist)
+		// ── Library ───────────────────────────────────────────────────────
+		r.Get("/api/artists", s.handleArtists)
+		r.Get("/api/artist/{id}", s.handleArtist)
+		r.Get("/api/album/{id}", s.handleAlbum)
+		r.Get("/api/search", s.handleSearch)
+		r.Get("/api/coverart/{id}", s.handleCoverArt)
 
-	// ── Audio devices ──────────────────────────────────────────────────────
-	r.Get("/api/devices", s.handleDevices)
-	r.Post("/api/device", s.handleDevice)
+		// ── Playlists ─────────────────────────────────────────────────────
+		r.Get("/api/playlists", s.handlePlaylists)
+		r.Get("/api/playlist/{id}", s.handlePlaylist)
+		r.Post("/api/play/playlist/{id}", s.handlePlayPlaylist)
+		r.Post("/api/queue/playlist/{id}", s.handleEnqueuePlaylist)
 
-	// ── Cache ──────────────────────────────────────────────────────────────
-	r.Delete("/api/cache", s.handleClearCache)
+		// ── Audio devices ─────────────────────────────────────────────────
+		r.Get("/api/devices", s.handleDevices)
+		r.Post("/api/device", s.handleDevice)
 
-	// ── State snapshot ─────────────────────────────────────────────────────
-	r.Get("/api/state", s.handleState)
+		// ── Cache ─────────────────────────────────────────────────────────
+		r.Delete("/api/cache", s.handleClearCache)
 
-	// ── Static frontend ────────────────────────────────────────────────────
-	r.Handle("/*", http.FileServer(http.FS(s.staticFS)))
+		// ── State snapshot ────────────────────────────────────────────────
+		r.Get("/api/state", s.handleState)
+	}
+
+	if s.mode.ServesFrontend() {
+		// ── Static frontend ───────────────────────────────────────────────
+		// spaHandler falls back to index.html for any path that isn't a real
+		// file, so client-side routes (e.g. /login after an auth redirect)
+		// are handled by React instead of returning 404.
+		r.Handle("/*", spaHandler(s.staticFS))
+	}
 
 	return r
 }
@@ -825,13 +888,55 @@ func (s *Server) errorf(w http.ResponseWriter, status int, format string, args .
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
+// handleConfig returns the runtime configuration needed by the frontend,
+// notably the API base URL when running in UI-only mode.
+// This endpoint is always public so the frontend can read it before login.
+func (s *Server) handleConfig(w http.ResponseWriter, _ *http.Request) {
+	s.json(w, map[string]string{"url": s.url})
+}
+
+// corsMiddleware adds Access-Control-Allow-* headers for requests whose Origin
+// matches one of the comma-separated entries in origins. Use "*" to reflect any
+// origin. Credentials are always allowed, so "*" reflects the request origin
+// rather than the literal wildcard (browsers reject wildcard + credentials).
+func corsMiddleware(origins string) func(http.Handler) http.Handler {
+	allowed := make(map[string]struct{})
+	hasStar := false
+	for _, o := range strings.Split(origins, ",") {
+		o = strings.TrimSpace(o)
+		if o == "*" {
+			hasStar = true
+		} else if o != "" {
+			allowed[o] = struct{}{}
+		}
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			_, exactMatch := allowed[origin]
+			if origin != "" && (hasStar || exactMatch) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Add("Vary", "Origin")
+			}
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // authMiddleware enforces token authentication when s.token is non-empty.
 // Authentication is carried by an HttpOnly session cookie set on successful login.
-// The /login page is always accessible. API and WebSocket paths return 401 JSON
-// when unauthenticated; everything else redirects to /login.
+// The /login and /config.json paths are always accessible. API and WebSocket paths
+// return 401 JSON when unauthenticated; everything else redirects to /login.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.token == "" || r.URL.Path == "/login" {
+		if s.token == "" || r.URL.Path == "/login" || r.URL.Path == "/config.json" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -857,7 +962,8 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 			Value:    s.token,
 			Path:     "/",
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: s.cookieSameSite,
+			Secure:   s.cookieSameSite == http.SameSiteNoneMode,
 		})
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -865,6 +971,26 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
 	w.Write([]byte(`{"error":"wrong token"}`)) //nolint:errcheck,gosec
+}
+
+// spaHandler wraps a file server with a single-page-application fallback:
+// any request whose path does not correspond to an existing file is served
+// index.html so that client-side routing works correctly.
+func spaHandler(fsys fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(fsys))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if _, err := fs.Stat(fsys, path); err != nil {
+			// API and WebSocket paths are not client-side routes; let them 404.
+			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/ws" {
+				http.NotFound(w, r)
+				return
+			}
+			r = r.Clone(r.Context())
+			r.URL.Path = "/"
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 }
 
 // requestLogger is a chi middleware that logs each HTTP request via zerolog.

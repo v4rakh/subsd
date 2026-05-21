@@ -1,5 +1,6 @@
 import { AUTH_FAILURE_EVENT } from './api';
 import App from './App';
+import { loadConfig } from './config';
 import { LoginScreen } from './components/LoginScreen';
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -35,8 +36,10 @@ function Root() {
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element not found');
-ReactDOM.createRoot(rootEl).render(
-	<React.StrictMode>
-		<Root />
-	</React.StrictMode>
-);
+loadConfig().then(() => {
+	ReactDOM.createRoot(rootEl).render(
+		<React.StrictMode>
+			<Root />
+		</React.StrictMode>
+	);
+});

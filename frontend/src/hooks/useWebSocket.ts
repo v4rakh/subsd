@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { getApiUrl } from '../config';
 
 const MIN_RETRY_MS = 1_000;
 const MAX_RETRY_MS = 30_000;
@@ -12,8 +13,18 @@ export function useWebSocket<T>(onMessage: (data: T) => void): boolean {
 	onMessageRef.current = onMessage;
 
 	const connect = useCallback(() => {
-		const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-		const ws = new WebSocket(`${proto}://${location.host}/ws`);
+		const base = getApiUrl();
+		let wsUrl: string;
+		if (base) {
+			const u = new URL(base);
+			u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+			u.pathname = '/ws';
+			wsUrl = u.toString();
+		} else {
+			const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+			wsUrl = `${proto}://${location.host}/ws`;
+		}
+		const ws = new WebSocket(wsUrl);
 		wsRef.current = ws;
 
 		ws.onopen = () => {

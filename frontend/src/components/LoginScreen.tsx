@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getApiUrl } from '../config';
 
 interface Props {
 	onSuccess: () => void;
@@ -17,7 +18,7 @@ export function LoginScreen({ onSuccess }: Props) {
 		setLoading(true);
 		try {
 			const body = new URLSearchParams({ token });
-			const r = await fetch('/login', { method: 'POST', body });
+			const r = await fetch(getApiUrl() + '/login', { method: 'POST', body, credentials: 'include' });
 			if (r.ok) {
 				onSuccess();
 			} else {

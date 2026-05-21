@@ -1,5 +1,5 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, EmptyState, SkeletonList } from './Panel';
-import { apiFetch } from '../api';
+import { apiFetch, apiUrl } from '../api';
 import type { Artist, Album, Song, SearchResult } from '../types';
 import { Play, PlusIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -31,7 +31,7 @@ function ArtistRow({ artist, onSelect }: { artist: Artist; onSelect: (a: Artist)
 			{artist.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
-					src={`/api/coverart/${artist.coverArt}`}
+					src={apiUrl(`/api/coverart/${artist.coverArt}`)}
 					alt=""
 					loading="lazy"
 					onError={(e) => {
@@ -74,7 +74,7 @@ function AlbumRow({
 			{album.coverArt ? (
 				<img
 					className="w-8 h-8 rounded object-cover shrink-0"
-					src={`/api/coverart/${album.coverArt}`}
+					src={apiUrl(`/api/coverart/${album.coverArt}`)}
 					alt=""
 					loading="lazy"
 					onError={(e) => {

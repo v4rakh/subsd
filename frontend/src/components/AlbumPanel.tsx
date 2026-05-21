@@ -1,4 +1,5 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList } from './Panel';
+import { apiUrl } from '../api';
 import type { Artist, Album } from '../types';
 import { PlusIcon, Play } from 'lucide-react';
 import { useState } from 'react';
@@ -55,7 +56,7 @@ export function AlbumPanel({
 							{a.coverArt && (
 								<img
 									className="w-10 h-10 rounded object-cover shrink-0"
-									src={`/api/coverart/${a.coverArt}`}
+									src={apiUrl(`/api/coverart/${a.coverArt}`)}
 									alt=""
 									loading="lazy"
 									onError={(e) => {

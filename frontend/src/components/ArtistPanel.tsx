@@ -1,4 +1,5 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList } from './Panel';
+import { apiUrl } from '../api';
 import type { Artist } from '../types';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +33,7 @@ export function ArtistPanel({ artists, selectedArtist, loading, onSelect, classN
 							{a.coverArt ? (
 								<img
 									className="w-10 h-10 rounded object-cover shrink-0"
-									src={`/api/coverart/${a.coverArt}`}
+									src={apiUrl(`/api/coverart/${a.coverArt}`)}
 									alt=""
 									loading="lazy"
 									onError={(e) => {

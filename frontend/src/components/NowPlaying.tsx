@@ -1,3 +1,4 @@
+import { apiUrl } from '../api';
 import { useAudioDevice, type AudioDevice } from '../hooks/useAudioDevice';
 import type { PlayerControls } from '../hooks/usePlayer';
 import type { Theme } from '../hooks/useTheme';
@@ -48,7 +49,7 @@ function TrackInfo({ track }: { track: Track | null }) {
 	return (
 		<>
 			{track?.coverArt ? (
-				<img className="w-12 h-12 rounded object-cover shrink-0" src={track.coverArt} alt="" />
+				<img className="w-12 h-12 rounded object-cover shrink-0" src={apiUrl(track.coverArt)} alt="" />
 			) : (
 				<div className="w-12 h-12 rounded bg-bg3 shrink-0" />
 			)}
