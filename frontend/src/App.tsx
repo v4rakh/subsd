@@ -32,7 +32,7 @@ export default function App() {
 	const [mobileTab, setMobileTab] = useState<MobileTab>('artists');
 	const [showOverlay, setShowOverlay] = useState(false);
 
-	const TABS = useMemo(
+	const TABS: { id: MobileTab; label: string }[] = useMemo(
 		() => [
 			{ id: 'artists', label: t('tabs.artists') },
 			{ id: 'albums', label: t('tabs.albums') },
@@ -242,7 +242,7 @@ export default function App() {
 					if (window.innerWidth >= 1024) setShowSearch(true);
 					else setMobileTab('search');
 				}}
-				onRefreshCache={() => apiFetch('/api/v1/cache', { method: 'POST' }).catch(() => {})}
+				onRefreshCache={() => apiFetch('/api/v1/cache', { method: 'POST' }).catch(() => { /* empty */ })}
 			/>
 
 			{/* Mobile tab bar */}

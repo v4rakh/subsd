@@ -371,6 +371,22 @@ var remoteCommand = &cli.Command{
 				return c.post(ctx, "/api/v1/play/playlist/"+id, nil)
 			},
 		},
+		{
+			Name:      "play-artist",
+			Usage:     "Play all songs by an artist immediately by Subsonic ID",
+			ArgsUsage: "<id>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				id, err := requireArg(cmd, "artist ID")
+				if err != nil {
+					return err
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				return c.post(ctx, "/api/v1/play/artist/"+id, nil)
+			},
+		},
 		// ── Queue management ──────────────────────────────────────────────
 		{
 			Name:  "queue",
@@ -490,9 +506,40 @@ var remoteCommand = &cli.Command{
 						return c.post(ctx, "/api/v1/queue/playlist/"+id, nil)
 					},
 				},
+				{
+					Name:      "add-artist",
+					Usage:     "Append all songs by an artist to the queue by Subsonic ID",
+					ArgsUsage: "<id>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						id, err := requireArg(cmd, "artist ID")
+						if err != nil {
+							return err
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.post(ctx, "/api/v1/queue/artist/"+id, nil)
+					},
+				},
 			},
 		},
 		// ── Library ───────────────────────────────────────────────────────
+		{
+			Name:  "songs",
+			Usage: "List all songs (requires warm cache)",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				data, err := c.get(ctx, "/api/v1/songs")
+				if err != nil {
+					return err
+				}
+				return printPrettyJSON(data)
+			},
+		},
 		{
 			Name:  "artists",
 			Usage: "List all artists",

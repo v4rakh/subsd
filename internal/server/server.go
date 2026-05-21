@@ -192,6 +192,7 @@ type Server struct {
 
 	sf singleflight.Group // deduplicates concurrent in-flight Subsonic fetches
 
+	libraryCacheTTL time.Duration
 	refreshInterval time.Duration
 	refreshTrigger  chan struct{} // buffered(1); send to request an immediate warm
 	refreshCancel   context.CancelFunc
@@ -245,9 +246,16 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, 
 		playlists:       cache.NewTTL[string, []subsonic.Playlist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		playlist:        cache.NewTTL[string, *subsonic.Playlist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		songs:           cache.NewTTL[string, []subsonic.Song](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
+		libraryCacheTTL: defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute),
 		refreshInterval: cfg.CacheRefreshInterval,
 		refreshTrigger:  make(chan struct{}, 1),
 		clients:         make(map[*websocket.Conn]*wsClient),
+	}
+	if s.refreshInterval > 0 && s.refreshInterval >= s.libraryCacheTTL {
+		log.Warn().
+			Dur("refresh_interval", s.refreshInterval).
+			Dur("library_cache_ttl", s.libraryCacheTTL).
+			Msg("server: cache-refresh-interval >= library-cache-ttl — songs may expire between refreshes; set library-cache-ttl > cache-refresh-interval")
 	}
 	if p != nil {
 		p.OnChange(func(state player.State) {
@@ -320,9 +328,12 @@ func (s *Server) Handler() http.Handler {
 		r.Post("/api/v1/queue/move", s.handleMove)
 		r.Post("/api/v1/play/song/{id}", s.handlePlaySong)
 		r.Post("/api/v1/play/album/{id}", s.handlePlayAlbum)
+		r.Post("/api/v1/play/artist/{id}", s.handlePlayArtist)
+		r.Post("/api/v1/queue/artist/{id}", s.handleEnqueueArtist)
 
 		// ── Library ───────────────────────────────────────────────────────
 		r.Get("/api/v1/artists", s.handleArtists)
+		r.Get("/api/v1/songs", s.handleSongs)
 		r.Get("/api/v1/artist/{id}", s.handleArtist)
 		r.Get("/api/v1/album/{id}", s.handleAlbum)
 		r.Get("/api/v1/search", s.handleSearch)
@@ -636,7 +647,37 @@ func (s *Server) handlePlayAlbum(w http.ResponseWriter, r *http.Request) {
 	s.ok(w)
 }
 
+func (s *Server) handlePlayArtist(w http.ResponseWriter, r *http.Request) {
+	tracks, err := s.artistToTracks(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		s.errorf(w, http.StatusInternalServerError, "%v", err)
+		return
+	}
+	s.player.SetQueue(tracks, 0)
+	s.ok(w)
+}
+
+func (s *Server) handleEnqueueArtist(w http.ResponseWriter, r *http.Request) {
+	tracks, err := s.artistToTracks(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		s.errorf(w, http.StatusInternalServerError, "%v", err)
+		return
+	}
+	s.player.AddAllToQueue(tracks)
+	s.ok(w)
+}
+
 // ── Library ────────────────────────────────────────────────────────────────────
+
+func (s *Server) handleSongs(w http.ResponseWriter, r *http.Request) {
+	songs, ok := s.songs.Get(songsKey)
+	if !ok {
+		s.triggerRefresh()
+		s.errorf(w, http.StatusServiceUnavailable, "song cache not ready, refresh triggered")
+		return
+	}
+	s.json(w, songs)
+}
 
 func (s *Server) handleArtists(w http.ResponseWriter, r *http.Request) {
 	artists, err := s.getArtists(r.Context())
@@ -1185,6 +1226,22 @@ func (s *Server) songToTrack(ctx context.Context, id string) (*player.Track, err
 	}
 	t := s.toTrack(*song)
 	return &t, nil
+}
+
+func (s *Server) artistToTracks(ctx context.Context, id string) ([]player.Track, error) {
+	artist, err := s.getArtist(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	var tracks []player.Track
+	for _, alb := range artist.Albums {
+		t, err := s.albumToTracks(ctx, alb.ID)
+		if err != nil {
+			return nil, err
+		}
+		tracks = append(tracks, t...)
+	}
+	return tracks, nil
 }
 
 func (s *Server) albumToTracks(ctx context.Context, id string) ([]player.Track, error) {

@@ -228,8 +228,8 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 	},
 	&cli.DurationFlag{
 		Name:    flagCacheLibraryTTL,
-		Usage:   "TTL for library metadata cache entries (artists, albums, playlists, songs)",
-		Value:   5 * time.Minute,
+		Usage:   "TTL for library metadata cache entries (artists, albums, playlists, songs); should exceed cache-refresh-interval to avoid songs becoming unavailable between refreshes",
+		Value:   90 * time.Minute,
 		Sources: cli.EnvVars(envCacheLibraryTTL),
 	},
 	&cli.DurationFlag{

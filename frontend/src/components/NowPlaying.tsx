@@ -143,7 +143,9 @@ function AudioDevicePopover({
 									method: 'POST',
 									headers: { 'Content-Type': 'application/json' },
 									body: JSON.stringify({ device: d.id })
-								}).catch(() => {});
+								}).catch(() => {
+									/* empty */
+								});
 								setDevice(d.id);
 								setOpen(false);
 							}}>
@@ -254,7 +256,9 @@ export function NowPlaying({
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name })
-		}).catch(() => {});
+		}).catch(() => {
+			/* empty */
+		});
 	}, []);
 
 	return (
