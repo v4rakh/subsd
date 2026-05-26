@@ -2,7 +2,7 @@
 
 ![logo](frontend/public/favicon/android-chrome-192x192.png)
 
-A music player for Navidrome (and any Subsonic-compatible server).
+A (remote) music player for Navidrome (and any Subsonic-compatible server).
 
 **Audio plays on the machine running subsd** or on any number of **subsd satellites** — separate processes running on
 other machines (a Raspberry Pi in the living room, a media PC in the bedroom, etc.) that register with the daemon and
@@ -10,7 +10,9 @@ handle local playback there. The web interface is a remote control, not a stream
 playback device from the UI, and no audio ever reaches the browser. This makes it well suited for a multi-room setup, a
 home server, or any Linux box connected to speakers, controlled from any device on the network.
 
-There's also a command-line tool to control the subsd daemon remotely.
+There's also a command-line tool to control the subsd daemon remotely, e.g., with `subsd remote play`. In addition,
+there's an [Android application](https://git.myservermanager.com/varakh/subsd-android) which can act as satellite or
+just as remote control.
 
 subsd uses mpv's IPC for playback (adapted from [stmps](https://github.com/wildeyedskies/stmps) (MIT)) and gRPC for
 communication with its satellites.
