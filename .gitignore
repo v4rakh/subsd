@@ -31,3 +31,7 @@ Thumbs.db
 result
 result/
 result/**
+
+# AI
+.claude/
+CLAUDE.md
