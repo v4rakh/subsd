@@ -69,6 +69,10 @@
           src = ./.;
           doCheck = false;
           vendorHash = "sha256-caJMOPpPOfix+saH61Ka0o24FDq8QPkXWc/NdbA7CJA=";
+          ldflags = [
+            "-s"
+            "-w"
+          ];
 
           preBuild = ''
             mkdir -p web
@@ -82,6 +86,11 @@
     )
     // {
       nixosModules.default = import ./nix/module.nix {
+        inherit self;
+        lib = nixpkgs.lib;
+      };
+
+      homeManagerModules.default = import ./nix/hm-module.nix {
         inherit self;
         lib = nixpkgs.lib;
       };

@@ -21,39 +21,12 @@ in
       description = "The subsd package to use.";
     };
 
-    user = lib.mkOption {
-      type = lib.types.str;
-      default = "subsd";
-      description = "System user to run subsd as.";
-    };
-
-    group = lib.mkOption {
-      type = lib.types.str;
-      default = "subsd";
-      description = "System group to run subsd as.";
-    };
-
-    additionalGroups = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      example = [
-        "audio"
-        "pipewire"
-      ];
-      description = "Additional supplementary groups for the subsd service user. The audio group is only needed for direct ALSA access; PipeWire/PulseAudio setups typically do not require it.";
-    };
-
     extraPackages = lib.mkOption {
       type = lib.types.listOf lib.types.package;
       default = [ pkgs.mpv ];
       defaultText = lib.literalExpression "[ pkgs.mpv ]";
       example = lib.literalExpression "[ pkgs.mpv pkgs.ffmpeg ]";
       description = "Extra packages to add to PATH for the subsd process. mpv is required for local playback and included by default.";
-    };
-
-    openFirewall = lib.mkEnableOption "" // {
-      description = "Whether to automatically open the necessary ports in the firewall.";
-      default = true;
     };
 
     # --- Required (except in frontend mode) ---
@@ -239,7 +212,7 @@ in
     stateFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Path to the state persistence file (SUBSD_STATE_FILE). Defaults to /var/lib/subsd/state.json when unset.";
+      description = "Path to the state persistence file (SUBSD_STATE_FILE). Defaults to \$XDG_STATE_HOME/subsd/state.json when unset.";
     };
 
     readTimeout = lib.mkOption {
@@ -362,30 +335,9 @@ in
         }
       ];
 
-    users.users = lib.mkIf (cfg.user == "subsd") {
-      subsd = {
-        isSystemUser = true;
-        group = cfg.group;
-        description = "subsd service user";
-      };
-    };
-
-    users.groups = lib.mkIf (cfg.group == "subsd") {
-      subsd = { };
-    };
-
-    networking.firewall.allowedTCPPorts =
-      let
-        isSatellite = cfg.mode == "satellite";
-        isFrontendOnly = cfg.mode == "frontend";
-        httpPorts = lib.optional (!isSatellite) cfg.addr.port;
-        grpcPorts = lib.optional (!isSatellite && !isFrontendOnly) cfg.grpcAddr.port;
-      in
-      lib.optionals cfg.openFirewall (httpPorts ++ grpcPorts);
-
-    systemd.services.subsd = {
+    systemd.user.services.subsd = {
       description = "subsd Navidrome/Subsonic web-controlled music player";
-      wantedBy = [ "multi-user.target" ];
+      wantedBy = [ "default.target" ];
       after = [ "network.target" ];
       path = cfg.extraPackages;
 
@@ -411,7 +363,8 @@ in
         // lib.optionalAttrs (cfg.mpvSocket != null) { SUBSD_MPV_SOCKET = cfg.mpvSocket; }
         // lib.optionalAttrs (cfg.logLevel != null) { SUBSD_LOG_LEVEL = cfg.logLevel; }
         // {
-          SUBSD_STATE_FILE = if cfg.stateFile != null then cfg.stateFile else "/var/lib/subsd/state.json";
+          SUBSD_STATE_FILE =
+            if cfg.stateFile != null then cfg.stateFile else "${config.xdg.stateHome}/subsd/state.json";
         }
         // lib.optionalAttrs (cfg.readTimeout != null) { SUBSD_READ_TIMEOUT = cfg.readTimeout; }
         // lib.optionalAttrs (cfg.cacheLibraryTtl != null) {
@@ -452,21 +405,13 @@ in
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/subsd";
-        User = cfg.user;
-        Group = cfg.group;
         Restart = "on-failure";
         RestartSec = "5s";
         StateDirectory = "subsd";
         StateDirectoryMode = "0750";
         NoNewPrivileges = true;
         PrivateTmp = true;
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        ReadWritePaths = [ "/var/lib/subsd" ];
-      }
-      // (lib.optionalAttrs (cfg.additionalGroups != [ ]) {
-        SupplementaryGroups = cfg.additionalGroups;
-      });
+      };
     };
   };
 }
