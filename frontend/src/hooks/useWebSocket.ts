@@ -18,11 +18,11 @@ export function useWebSocket<T>(onMessage: (data: T) => void): boolean {
 		if (base) {
 			const u = new URL(base);
 			u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
-			u.pathname = '/ws';
+			u.pathname = '/api/v1/ws';
 			wsUrl = u.toString();
 		} else {
 			const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-			wsUrl = `${proto}://${location.host}/ws`;
+			wsUrl = `${proto}://${location.host}/api/v1/ws`;
 		}
 		const ws = new WebSocket(wsUrl);
 		wsRef.current = ws;

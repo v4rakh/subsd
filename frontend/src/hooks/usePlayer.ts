@@ -65,7 +65,7 @@ export function usePlayer(): {
 					setSatellites(msg.satellites ?? []);
 				} else if (msg.type === 'satellite_disconnected') {
 					toast.warning(t('toast.satelliteDisconnected', { name: msg.name }));
-				} else {
+				} else if (msg.type === 'state') {
 					setPlayerState({ ...msg, queue: msg.queue ?? [] });
 				}
 			},

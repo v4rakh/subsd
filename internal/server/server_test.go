@@ -994,7 +994,7 @@ func TestModeFrontend_APIAndWSRoutesReturn404(t *testing.T) {
 		{http.MethodGet, "/api/v1/state"},
 		{http.MethodGet, "/api/v1/artists"},
 		{http.MethodPost, "/api/v1/playpause"},
-		{http.MethodGet, "/ws"},
+		{http.MethodGet, "/api/v1/ws"},
 	} {
 		w := doRequest(h, tc.method, tc.path, "")
 		if w.Code == http.StatusOK {

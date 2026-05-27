@@ -106,9 +106,8 @@ export interface SatelliteInfo {
 	activeDevice: string;
 }
 
-// WebSocket message union. All messages carry a `v` version field.
-// Player state messages have no `type` field; satellite list messages carry `type: "satellites"`.
+// WebSocket message union. All messages carry a `v` version field and an explicit `type`.
 export type WsMessage =
-	| (PlayerState & { v?: number; type?: undefined })
+	| (PlayerState & { v?: number; type: 'state' })
 	| { v?: number; type: 'satellites'; satellites: SatelliteInfo[] }
 	| { v?: number; type: 'satellite_disconnected'; name: string };

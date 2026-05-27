@@ -1,16 +1,16 @@
 import { apiFetch } from '../api';
-import type { PlayerState } from '../types';
+import type { WsMessage } from '../types';
 import { usePlayer } from './usePlayer';
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock useWebSocket so tests don't need a live WebSocket server.
 // The mock exposes onMessage so tests can inject state updates.
-let capturedOnMessage: ((data: PlayerState) => void) | null = null;
+let capturedOnMessage: ((data: WsMessage) => void) | null = null;
 let mockConnected = true;
 
 vi.mock('./useWebSocket', () => ({
-	useWebSocket: (onMessage: (data: PlayerState) => void) => {
+	useWebSocket: (onMessage: (data: WsMessage) => void) => {
 		capturedOnMessage = onMessage;
 		return mockConnected;
 	}
@@ -52,7 +52,8 @@ describe('usePlayer — WebSocket state sync', () => {
 	it('updates playerState on WebSocket message', () => {
 		const { result } = renderHook(() => usePlayer());
 
-		const newState: PlayerState = {
+		const newState: WsMessage = {
+			type: 'state',
 			playing: true,
 			currentIdx: 2,
 			queue: [{ id: 't1', title: 'T', artist: 'A', album: 'B', duration: 100, coverArt: '', streamUrl: '' }],
@@ -79,6 +80,7 @@ describe('usePlayer — WebSocket state sync', () => {
 		act(() => {
 			// Simulate a message where queue is omitted/null (server may send this).
 			capturedOnMessage?.({
+				type: 'state',
 				playing: false,
 				currentIdx: -1,
 				queue: null as unknown as [],

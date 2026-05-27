@@ -105,9 +105,10 @@ func (c *wsClient) send(data []byte) error {
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
-// wsPlayerMsg wraps player.State with a v (version) field for the WebSocket envelope.
+// wsPlayerMsg wraps player.State with a v (version) and type field for the WebSocket envelope.
 type wsPlayerMsg struct {
-	V int `json:"v"`
+	V    int    `json:"v"`
+	Type string `json:"type"`
 	player.State
 }
 
@@ -306,7 +307,7 @@ func (s *Server) Handler() http.Handler {
 		r.Post("/login", s.handleLoginPost)
 
 		// ── WebSocket ─────────────────────────────────────────────────────
-		r.Get("/ws", s.handleWS)
+		r.Get("/api/v1/ws", s.handleWS)
 
 		// ── Player controls ───────────────────────────────────────────────
 		r.Post("/api/v1/play", s.handlePlay)
@@ -444,7 +445,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	// Send full state immediately so the new client is in sync. This write
 	// and any concurrent broadcast both go through wc.send, which holds
 	// wc.mu, so they cannot interleave on the connection.
-	if data, err := json.Marshal(wsPlayerMsg{V: 1, State: s.player.GetState()}); err == nil {
+	if data, err := json.Marshal(wsPlayerMsg{V: 1, Type: "state", State: s.player.GetState()}); err == nil {
 		if err := wc.send(data); err != nil {
 			log.Debug().Err(err).Msg("server: ws initial send failed")
 			s.mu.Lock()
@@ -480,7 +481,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) broadcast(state player.State) {
-	data, _ := json.Marshal(wsPlayerMsg{V: 1, State: state})
+	data, _ := json.Marshal(wsPlayerMsg{V: 1, Type: "state", State: state})
 	s.broadcastRaw(data)
 }
 
@@ -1369,7 +1370,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/ws" {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"unauthorized"}`)) //nolint:errcheck,gosec
@@ -1407,7 +1408,7 @@ func spaHandler(fsys fs.FS) http.Handler {
 		path := strings.TrimPrefix(r.URL.Path, "/")
 		if _, err := fs.Stat(fsys, path); err != nil {
 			// API and WebSocket paths are not client-side routes; let them 404.
-			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/ws" {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
 				http.NotFound(w, r)
 				return
 			}
