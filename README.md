@@ -57,7 +57,7 @@ see [module.nix](./nix/module.nix).
 ## Usage
 
 ```shell
-subsd --host <url> --user <username> --pass <password> [options]
+subsd --subsonic-host <url> ----subsonic-user <username> ----subsonic-pass <password> [options]
 ```
 
 Once started, open the web UI in a browser (default: `http://<host>:8080`) to browse your library and control playback.
@@ -68,7 +68,7 @@ All flags can also be set via environment variables (shown in the tables below) 
 ### Required flags
 
 | Flag              | Environment           | Description                                                             |
-|-------------------|-----------------------|-------------------------------------------------------------------------|
+| ----------------- | --------------------- | ----------------------------------------------------------------------- |
 | `--subsonic-host` | `SUBSD_SUBSONIC_HOST` | URL of your Navidrome/Subsonic server (e.g. `http://192.168.1.10:4533`) |
 | `--subsonic-user` | `SUBSD_SUBSONIC_USER` | Username                                                                |
 | `--subsonic-pass` | `SUBSD_SUBSONIC_PASS` | Password                                                                |
@@ -78,7 +78,7 @@ All flags can also be set via environment variables (shown in the tables below) 
 #### General
 
 | Flag             | Environment          | Default                      | Description                                                                                        |
-|------------------|----------------------|------------------------------|----------------------------------------------------------------------------------------------------|
+| ---------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
 | `--addr`         | `SUBSD_ADDR`         | `:8080`                      | Address the web UI listens on                                                                      |
 | `--log-level`    | `SUBSD_LOG_LEVEL`    | `info`                       | Log verbosity: `debug`, `info`, `warn`, or `error`                                                 |
 | `--read-timeout` | `SUBSD_READ_TIMEOUT` | `60s`                        | HTTP server read timeout                                                                           |
@@ -90,7 +90,7 @@ All flags can also be set via environment variables (shown in the tables below) 
 #### Authentication & TLS (HTTP)
 
 | Flag                | Environment             | Default | Description                                                                 |
-|---------------------|-------------------------|---------|-----------------------------------------------------------------------------|
+| ------------------- | ----------------------- | ------- | --------------------------------------------------------------------------- |
 | `--token`           | `SUBSD_TOKEN`           | —       | Shared access token; if set, requires login before the UI is accessible     |
 | `--token-file`      | `SUBSD_TOKEN_FILE`      | —       | Read access token from a file instead of `--token`                          |
 | `--tls-cert`        | `SUBSD_TLS_CERT`        | —       | Path to TLS certificate file (enables HTTPS when combined with `--tls-key`) |
@@ -101,7 +101,7 @@ All flags can also be set via environment variables (shown in the tables below) 
 #### Subsonic credentials
 
 | Flag                   | Environment                | Default | Description                                            |
-|------------------------|----------------------------|---------|--------------------------------------------------------|
+| ---------------------- | -------------------------- | ------- | ------------------------------------------------------ |
 | `--subsonic-user-file` | `SUBSD_SUBSONIC_USER_FILE` | —       | Read username from a file instead of `--subsonic-user` |
 | `--subsonic-pass-file` | `SUBSD_SUBSONIC_PASS_FILE` | —       | Read password from a file instead of `--subsonic-pass` |
 
@@ -111,7 +111,7 @@ other, not both.
 #### Cache
 
 | Flag                       | Environment                    | Default | Description                                                                        |
-|----------------------------|--------------------------------|---------|------------------------------------------------------------------------------------|
+| -------------------------- | ------------------------------ | ------- | ---------------------------------------------------------------------------------- |
 | `--cache-library-ttl`      | `SUBSD_CACHE_LIBRARY_TTL`      | `5m`    | TTL for library metadata cache entries (artists, albums, playlists, songs)         |
 | `--cache-coverart-ttl`     | `SUBSD_CACHE_COVERART_TTL`     | `24h`   | TTL for cover art cache entries                                                    |
 | `--cache-refresh-interval` | `SUBSD_CACHE_REFRESH_INTERVAL` | `1h`    | How often to refresh the full library cache in the background (0 = on-demand only) |
@@ -122,7 +122,7 @@ These flags control the gRPC server (daemon/full mode) and client (satellite mod
 optional and independent — use neither, either, or both.
 
 | Flag                                   | Environment                                | Default      | Description                                                                                      |
-|----------------------------------------|--------------------------------------------|--------------|--------------------------------------------------------------------------------------------------|
+| -------------------------------------- | ------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
 | `--grpc-addr`                          | `SUBSD_GRPC_ADDR`                          | `:9090`      | gRPC listen address (daemon/full) or dial address (satellite)                                    |
 | `--satellite-name`                     | `SUBSD_SATELLITE_NAME`                     | _(hostname)_ | Stable name for this satellite (satellite mode)                                                  |
 | `--grpc-tls-cert`                      | `SUBSD_GRPC_TLS_CERT`                      | —            | TLS certificate for the gRPC server (daemon/full modes)                                          |
@@ -145,7 +145,7 @@ The `subsd remote` subcommand controls a running daemon over HTTP. Configure it 
 flags/env vars:
 
 | Flag / env                       | Description                                              |
-|----------------------------------|----------------------------------------------------------|
+| -------------------------------- | -------------------------------------------------------- |
 | `--url` / `SUBSD_REMOTE_URL`     | Base URL of the daemon (e.g. `http://192.168.1.10:8080`) |
 | `--token` / `SUBSD_REMOTE_TOKEN` | Access token (same as `--token` on the daemon)           |
 
@@ -233,22 +233,22 @@ Major updates undergo manual review.
 > Use the `v` prefix in the Forge. Don't use it for internal version code references!
 
 1. Prepare a new MR to trunk with the following changes
-    - Adjust and align versions
-        - `flake.nix`: `version`
-        - `frontend/package.json`: `version`
-        - `cmd/main.go`: `Version`
-    - Make sure `make clean dependencies build checkstyle audit` is fine
-    - Make sure `nix build` is fine (you need `nix` for it, update checksums in `flake.nix` if it fails)
-    - Use `release/` as branch prefix and `release: prepare XYZ` as commit message
+   - Adjust and align versions
+     - `flake.nix`: `version`
+     - `frontend/package.json`: `version`
+     - `cmd/main.go`: `Version`
+   - Make sure `make clean dependencies build checkstyle audit` is fine
+   - Make sure `nix build` is fine (you need `nix` for it, update checksums in `flake.nix` if it fails)
+   - Use `release/` as branch prefix and `release: prepare XYZ` as commit message
 2. Merge to trunk
 3. Trigger the release job the semantic version which is inside the main trunk (use `v` prefix!)
 4. Generate changelog and attach it to the release (use `git-cliff`)
 5. Pull changes from trunk, prepare a new MR to trunk to prepare next version
-    - Adjust and align versions to the next semantic _patch_ version
-    - `flake.nix`: `version`
-    - `frontend/package.json`: `version`
-    - `cmd/main.go`: `Version`
-    - Use `release/` as branch prefix and `release: prepare next cycle...` as commit message
+   - Adjust and align versions to the next semantic _patch_ version
+   - `flake.nix`: `version`
+   - `frontend/package.json`: `version`
+   - `cmd/main.go`: `Version`
+   - Use `release/` as branch prefix and `release: prepare next cycle...` as commit message
 6. Merge to trunk
 
 ### Dependency updates
