@@ -25,7 +25,7 @@ import (
 	"varakh.de/subsd/web"
 )
 
-const version = "0.3.0"
+const version = "0.3.1"
 
 // ── Flag names ────────────────────────────────────────────────────────────────
 

@@ -21,7 +21,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.3.0";
+        version = "0.3.1";
         frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
           pname = "subsd-ui";
           inherit version;
