@@ -9,4 +9,4 @@ runs:
     - name: Build, Checkstyle, Test
       shell: bash
       run: |
-        make clean dependencies build checkstyle test
+        make clean dependencies build-all checkstyle test

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -974,7 +973,7 @@ func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
 	)
 	// Ensure mpv dies whenever the parent process exits — including crashes,
 	// panics, and SIGKILL — not only on graceful shutdown.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL, Setpgid: true}
+	setSysProcAttr(cmd)
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
