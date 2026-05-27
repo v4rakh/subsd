@@ -65,6 +65,7 @@ type PlayerController interface {
 	GetAudioDevices() ([]player.AudioDevice, error)
 	GetAudioDevice() string
 	SetAudioDevice(name string) error
+	SetReplayGain(mode string)
 }
 
 // coverArtKey uniquely identifies a cover art request by Subsonic ID and
@@ -120,11 +121,10 @@ const (
 	ModeDaemon
 	// ModeFrontend serves only the embedded frontend; all API/WS routes are absent.
 	ModeFrontend
+	// ModeSatellite is a binary that connects to a remote subsd daemon as a satellite.
+	// It does not start an HTTP or gRPC server; it only dials and registers.
+	ModeSatellite
 )
-
-// ModeSatellite is a binary that connects to a remote subsd daemon as a satellite.
-// It does not start an HTTP or gRPC server; it only dials and registers.
-const ModeSatellite Mode = 3
 
 // ParseMode converts a string ("full", "daemon", "frontend", "satellite", or "") to a Mode.
 func ParseMode(s string) (Mode, error) {
@@ -264,10 +264,10 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, 
 		p.OnTrackEnd(func(t player.Track) {
 			if err := client.Scrobble(context.Background(), t.ID); err != nil {
 				log.Error().Err(err).Str("id", t.ID).Str("title", t.Title).Msg("server: scrobble failed")
-				p.SetLastScrobble("error")
+				p.SetLastScrobble(player.ScrobbleError)
 			} else {
 				log.Debug().Str("id", t.ID).Str("title", t.Title).Msg("server: scrobbled")
-				p.SetLastScrobble("ok")
+				p.SetLastScrobble(player.ScrobbleOK)
 			}
 		})
 	}
@@ -348,6 +348,9 @@ func (s *Server) Handler() http.Handler {
 		// ── Audio devices ─────────────────────────────────────────────────
 		r.Get("/api/v1/devices", s.handleDevices)
 		r.Post("/api/v1/device", s.handleDevice)
+
+		// ── ReplayGain ────────────────────────────────────────────────────
+		r.Post("/api/v1/replaygain", s.handleReplayGain)
 
 		// ── Satellites ────────────────────────────────────────────────────
 		if s.registry != nil {
@@ -844,6 +847,20 @@ func (s *Server) handleDevice(w http.ResponseWriter, r *http.Request) {
 		s.errorf(w, http.StatusInternalServerError, "%v", err)
 		return
 	}
+	s.ok(w)
+}
+
+// ── ReplayGain ─────────────────────────────────────────────────────────────────
+
+func (s *Server) handleReplayGain(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	s.player.SetReplayGain(body.Mode)
 	s.ok(w)
 }
 

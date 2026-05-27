@@ -229,3 +229,11 @@ func (sc *SatelliteController) GetAudioDevice() string {
 func (sc *SatelliteController) SetAudioDevice(name string) error {
 	return sc.registry.Dispatch(satellite.Command{Type: satellite.CmdSetAudioDevice, Device: name})
 }
+
+// SetReplayGain updates the local player and broadcasts the new mode to all
+// connected satellites so the setting is consistent when switching the active one.
+func (sc *SatelliteController) SetReplayGain(mode string) {
+	log.Info().Str("mode", mode).Msg("satellite: replaygain set")
+	sc.player.SetReplayGain(mode)
+	sc.registry.BroadcastAll(satellite.Command{Type: satellite.CmdSetReplayGain, ReplayGain: mode})
+}

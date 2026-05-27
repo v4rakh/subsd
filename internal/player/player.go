@@ -15,6 +15,19 @@ import (
 	"varakh.de/subsd/internal/mpv"
 )
 
+// Scrobble outcome values stored in State.LastScrobble.
+const (
+	ScrobbleOK    = "ok"
+	ScrobbleError = "error"
+)
+
+// ReplayGain mode values stored in State.ReplayGain and passed to mpv.
+const (
+	ReplayGainOff   = "no"
+	ReplayGainTrack = "track"
+	ReplayGainAlbum = "album"
+)
+
 // State is the full snapshot broadcast to browsers over WebSocket.
 type State struct {
 	Playing      bool    `json:"playing"`
@@ -26,6 +39,7 @@ type State struct {
 	Shuffle      bool    `json:"shuffle"`
 	Repeat       bool    `json:"repeat"`
 	LastScrobble string  `json:"lastScrobble"` // "", "ok", or "error"
+	ReplayGain   string  `json:"replayGain"`   // "no", "track", or "album"
 }
 
 // AudioDevice is one mpv audio output device entry.
@@ -105,7 +119,9 @@ func (b *mpvBackend) PlayURL(t Track, position float64) {
 	b.p.mu.Lock()
 	b.p.pendingSeek = position
 	b.p.pendingUnpause = true
+	mode := b.p.state.ReplayGain
 	b.p.mu.Unlock()
+	b.p.ipc().Set("replaygain", mode) //nolint:errcheck,gosec
 	if _, err := b.p.ipc().Command("loadfile", t.StreamURL, "replace"); err != nil {
 		log.Error().Err(err).Str("url", t.StreamURL).Msg("player/mpv: loadfile failed")
 	}
@@ -138,7 +154,9 @@ func (b *mpvBackend) Resume() {
 			// with --idle=yes stays paused after loadfile until explicitly unpaused.
 			b.p.mu.Lock()
 			b.p.pendingUnpause = true
+			mode := b.p.state.ReplayGain
 			b.p.mu.Unlock()
+			b.p.ipc().Set("replaygain", mode)             //nolint:errcheck,gosec
 			b.p.ipc().Command("loadfile", url, "replace") //nolint:errcheck,gosec
 		}
 		return
@@ -207,6 +225,7 @@ func newWithIPC(conn mpv.IPC, socketPath string, cmd *exec.Cmd) *Player {
 			Volume:     100,
 			CurrentIdx: -1,
 			Queue:      []Track{},
+			ReplayGain: ReplayGainOff,
 		},
 	}
 	lb := &mpvBackend{p: p}
@@ -592,6 +611,22 @@ func (p *Player) SetVolume(vol int) {
 	p.state.Volume = vol
 	p.mu.Unlock()
 	p.ipc().Set("volume", vol) //nolint:errcheck,gosec
+	p.notify()
+}
+
+// SetReplayGain stores the ReplayGain mode ("no", "track", or "album").
+// The mode is applied via set_property immediately before each loadfile call,
+// so it takes effect on the next track; the currently-playing track is unaffected.
+func (p *Player) SetReplayGain(mode string) {
+	switch mode {
+	case ReplayGainOff, ReplayGainTrack, ReplayGainAlbum:
+	default:
+		mode = ReplayGainOff
+	}
+	log.Info().Str("mode", mode).Msg("player: replaygain mode set")
+	p.mu.Lock()
+	p.state.ReplayGain = mode
+	p.mu.Unlock()
 	p.notify()
 }
 

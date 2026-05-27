@@ -67,16 +67,17 @@ message ServerMessage {
 }
 
 message Command {
-  CommandType type     = 1;
-  string      url      = 2; // PLAY
-  double      position = 3; // PLAY (resume offset) / SEEK
-  int32       volume   = 4; // SET_VOLUME
-  string      device   = 5; // SET_AUDIO_DEVICE
+  CommandType type        = 1;
+  string      url         = 2; // PLAY
+  double      position    = 3; // PLAY (resume offset) / SEEK
+  int32       volume      = 4; // SET_VOLUME
+  string      device      = 5; // SET_AUDIO_DEVICE
   // Track metadata — populated for PLAY so the satellite can log properly
-  string      id       = 6;
-  string      title    = 7;
-  string      artist   = 8;
-  string      album    = 9;
+  string      id          = 6;
+  string      title       = 7;
+  string      artist      = 8;
+  string      album       = 9;
+  string      replay_gain = 10; // SET_REPLAY_GAIN: "no", "track", or "album"
 }
 
 enum CommandType {
@@ -87,6 +88,7 @@ enum CommandType {
   SET_VOLUME       = 4;
   SET_AUDIO_DEVICE = 5;
   RESUME           = 6;
+  SET_REPLAY_GAIN  = 7;
 }
 
 message RequestDevices {}

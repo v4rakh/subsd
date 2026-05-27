@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v6.32.1
-// source: satellite.proto
+// source: proto/satellite.proto
 
 package satellitepb
 
@@ -54,11 +54,11 @@ func (x Status) String() string {
 }
 
 func (Status) Descriptor() protoreflect.EnumDescriptor {
-	return file_satellite_proto_enumTypes[0].Descriptor()
+	return file_proto_satellite_proto_enumTypes[0].Descriptor()
 }
 
 func (Status) Type() protoreflect.EnumType {
-	return &file_satellite_proto_enumTypes[0]
+	return &file_proto_satellite_proto_enumTypes[0]
 }
 
 func (x Status) Number() protoreflect.EnumNumber {
@@ -67,7 +67,7 @@ func (x Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Status.Descriptor instead.
 func (Status) EnumDescriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{0}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{0}
 }
 
 type CommandType int32
@@ -80,6 +80,7 @@ const (
 	CommandType_SET_VOLUME       CommandType = 4
 	CommandType_SET_AUDIO_DEVICE CommandType = 5
 	CommandType_RESUME           CommandType = 6
+	CommandType_SET_REPLAY_GAIN  CommandType = 7
 )
 
 // Enum value maps for CommandType.
@@ -92,6 +93,7 @@ var (
 		4: "SET_VOLUME",
 		5: "SET_AUDIO_DEVICE",
 		6: "RESUME",
+		7: "SET_REPLAY_GAIN",
 	}
 	CommandType_value = map[string]int32{
 		"PLAY":             0,
@@ -101,6 +103,7 @@ var (
 		"SET_VOLUME":       4,
 		"SET_AUDIO_DEVICE": 5,
 		"RESUME":           6,
+		"SET_REPLAY_GAIN":  7,
 	}
 )
 
@@ -115,11 +118,11 @@ func (x CommandType) String() string {
 }
 
 func (CommandType) Descriptor() protoreflect.EnumDescriptor {
-	return file_satellite_proto_enumTypes[1].Descriptor()
+	return file_proto_satellite_proto_enumTypes[1].Descriptor()
 }
 
 func (CommandType) Type() protoreflect.EnumType {
-	return &file_satellite_proto_enumTypes[1]
+	return &file_proto_satellite_proto_enumTypes[1]
 }
 
 func (x CommandType) Number() protoreflect.EnumNumber {
@@ -128,7 +131,7 @@ func (x CommandType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CommandType.Descriptor instead.
 func (CommandType) EnumDescriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{1}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{1}
 }
 
 type SatelliteMessage struct {
@@ -147,7 +150,7 @@ type SatelliteMessage struct {
 
 func (x *SatelliteMessage) Reset() {
 	*x = SatelliteMessage{}
-	mi := &file_satellite_proto_msgTypes[0]
+	mi := &file_proto_satellite_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -159,7 +162,7 @@ func (x *SatelliteMessage) String() string {
 func (*SatelliteMessage) ProtoMessage() {}
 
 func (x *SatelliteMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[0]
+	mi := &file_proto_satellite_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -172,7 +175,7 @@ func (x *SatelliteMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SatelliteMessage.ProtoReflect.Descriptor instead.
 func (*SatelliteMessage) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{0}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SatelliteMessage) GetPayload() isSatelliteMessage_Payload {
@@ -271,7 +274,7 @@ type Registration struct {
 
 func (x *Registration) Reset() {
 	*x = Registration{}
-	mi := &file_satellite_proto_msgTypes[1]
+	mi := &file_proto_satellite_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -283,7 +286,7 @@ func (x *Registration) String() string {
 func (*Registration) ProtoMessage() {}
 
 func (x *Registration) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[1]
+	mi := &file_proto_satellite_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -296,7 +299,7 @@ func (x *Registration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Registration.ProtoReflect.Descriptor instead.
 func (*Registration) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{1}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Registration) GetName() string {
@@ -323,7 +326,7 @@ type AudioDevice struct {
 
 func (x *AudioDevice) Reset() {
 	*x = AudioDevice{}
-	mi := &file_satellite_proto_msgTypes[2]
+	mi := &file_proto_satellite_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -335,7 +338,7 @@ func (x *AudioDevice) String() string {
 func (*AudioDevice) ProtoMessage() {}
 
 func (x *AudioDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[2]
+	mi := &file_proto_satellite_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -348,7 +351,7 @@ func (x *AudioDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AudioDevice.ProtoReflect.Descriptor instead.
 func (*AudioDevice) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{2}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AudioDevice) GetId() string {
@@ -379,7 +382,7 @@ type PlayerState struct {
 
 func (x *PlayerState) Reset() {
 	*x = PlayerState{}
-	mi := &file_satellite_proto_msgTypes[3]
+	mi := &file_proto_satellite_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +394,7 @@ func (x *PlayerState) String() string {
 func (*PlayerState) ProtoMessage() {}
 
 func (x *PlayerState) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[3]
+	mi := &file_proto_satellite_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +407,7 @@ func (x *PlayerState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerState.ProtoReflect.Descriptor instead.
 func (*PlayerState) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{3}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PlayerState) GetStatus() Status {
@@ -458,7 +461,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_satellite_proto_msgTypes[4]
+	mi := &file_proto_satellite_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -470,7 +473,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[4]
+	mi := &file_proto_satellite_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -483,7 +486,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{4}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Heartbeat) GetTimestampMs() int64 {
@@ -502,7 +505,7 @@ type DeviceList struct {
 
 func (x *DeviceList) Reset() {
 	*x = DeviceList{}
-	mi := &file_satellite_proto_msgTypes[5]
+	mi := &file_proto_satellite_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -514,7 +517,7 @@ func (x *DeviceList) String() string {
 func (*DeviceList) ProtoMessage() {}
 
 func (x *DeviceList) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[5]
+	mi := &file_proto_satellite_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -527,7 +530,7 @@ func (x *DeviceList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceList.ProtoReflect.Descriptor instead.
 func (*DeviceList) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{5}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DeviceList) GetDevices() []*AudioDevice {
@@ -545,7 +548,7 @@ type TrackEnded struct {
 
 func (x *TrackEnded) Reset() {
 	*x = TrackEnded{}
-	mi := &file_satellite_proto_msgTypes[6]
+	mi := &file_proto_satellite_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -557,7 +560,7 @@ func (x *TrackEnded) String() string {
 func (*TrackEnded) ProtoMessage() {}
 
 func (x *TrackEnded) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[6]
+	mi := &file_proto_satellite_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -570,7 +573,7 @@ func (x *TrackEnded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrackEnded.ProtoReflect.Descriptor instead.
 func (*TrackEnded) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{6}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{6}
 }
 
 type ServerMessage struct {
@@ -586,7 +589,7 @@ type ServerMessage struct {
 
 func (x *ServerMessage) Reset() {
 	*x = ServerMessage{}
-	mi := &file_satellite_proto_msgTypes[7]
+	mi := &file_proto_satellite_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +601,7 @@ func (x *ServerMessage) String() string {
 func (*ServerMessage) ProtoMessage() {}
 
 func (x *ServerMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[7]
+	mi := &file_proto_satellite_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +614,7 @@ func (x *ServerMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerMessage.ProtoReflect.Descriptor instead.
 func (*ServerMessage) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{7}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ServerMessage) GetPayload() isServerMessage_Payload {
@@ -667,13 +670,14 @@ type Command struct {
 	Title         string `protobuf:"bytes,7,opt,name=title,proto3" json:"title,omitempty"`
 	Artist        string `protobuf:"bytes,8,opt,name=artist,proto3" json:"artist,omitempty"`
 	Album         string `protobuf:"bytes,9,opt,name=album,proto3" json:"album,omitempty"`
+	ReplayGain    string `protobuf:"bytes,10,opt,name=replay_gain,json=replayGain,proto3" json:"replay_gain,omitempty"` // SET_REPLAY_GAIN: "no", "track", or "album"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_satellite_proto_msgTypes[8]
+	mi := &file_proto_satellite_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -685,7 +689,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[8]
+	mi := &file_proto_satellite_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -698,7 +702,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{8}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Command) GetType() CommandType {
@@ -764,6 +768,13 @@ func (x *Command) GetAlbum() string {
 	return ""
 }
 
+func (x *Command) GetReplayGain() string {
+	if x != nil {
+		return x.ReplayGain
+	}
+	return ""
+}
+
 type RequestDevices struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -772,7 +783,7 @@ type RequestDevices struct {
 
 func (x *RequestDevices) Reset() {
 	*x = RequestDevices{}
-	mi := &file_satellite_proto_msgTypes[9]
+	mi := &file_proto_satellite_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +795,7 @@ func (x *RequestDevices) String() string {
 func (*RequestDevices) ProtoMessage() {}
 
 func (x *RequestDevices) ProtoReflect() protoreflect.Message {
-	mi := &file_satellite_proto_msgTypes[9]
+	mi := &file_proto_satellite_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -797,14 +808,14 @@ func (x *RequestDevices) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestDevices.ProtoReflect.Descriptor instead.
 func (*RequestDevices) Descriptor() ([]byte, []int) {
-	return file_satellite_proto_rawDescGZIP(), []int{9}
+	return file_proto_satellite_proto_rawDescGZIP(), []int{9}
 }
 
-var File_satellite_proto protoreflect.FileDescriptor
+var File_proto_satellite_proto protoreflect.FileDescriptor
 
-const file_satellite_proto_rawDesc = "" +
+const file_proto_satellite_proto_rawDesc = "" +
 	"\n" +
-	"\x0fsatellite.proto\x12\tsatellite\"\xaf\x02\n" +
+	"\x15proto/satellite.proto\x12\tsatellite\"\xaf\x02\n" +
 	"\x10SatelliteMessage\x12=\n" +
 	"\fregistration\x18\x01 \x01(\v2\x17.satellite.RegistrationH\x00R\fregistration\x124\n" +
 	"\theartbeat\x18\x02 \x01(\v2\x14.satellite.HeartbeatH\x00R\theartbeat\x12.\n" +
@@ -837,7 +848,7 @@ const file_satellite_proto_rawDesc = "" +
 	"\rServerMessage\x12.\n" +
 	"\acommand\x18\x01 \x01(\v2\x12.satellite.CommandH\x00R\acommand\x12D\n" +
 	"\x0frequest_devices\x18\x02 \x01(\v2\x19.satellite.RequestDevicesH\x00R\x0erequestDevicesB\t\n" +
-	"\apayload\"\xe7\x01\n" +
+	"\apayload\"\x88\x02\n" +
 	"\aCommand\x12*\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x16.satellite.CommandTypeR\x04type\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12\x1a\n" +
@@ -847,13 +858,16 @@ const file_satellite_proto_rawDesc = "" +
 	"\x02id\x18\x06 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\a \x01(\tR\x05title\x12\x16\n" +
 	"\x06artist\x18\b \x01(\tR\x06artist\x12\x14\n" +
-	"\x05album\x18\t \x01(\tR\x05album\"\x10\n" +
+	"\x05album\x18\t \x01(\tR\x05album\x12\x1f\n" +
+	"\vreplay_gain\x18\n" +
+	" \x01(\tR\n" +
+	"replayGain\"\x10\n" +
 	"\x0eRequestDevices*+\n" +
 	"\x06Status\x12\b\n" +
 	"\x04IDLE\x10\x00\x12\v\n" +
 	"\aPLAYING\x10\x01\x12\n" +
 	"\n" +
-	"\x06PAUSED\x10\x02*h\n" +
+	"\x06PAUSED\x10\x02*}\n" +
 	"\vCommandType\x12\b\n" +
 	"\x04PLAY\x10\x00\x12\t\n" +
 	"\x05PAUSE\x10\x01\x12\b\n" +
@@ -863,25 +877,26 @@ const file_satellite_proto_rawDesc = "" +
 	"SET_VOLUME\x10\x04\x12\x14\n" +
 	"\x10SET_AUDIO_DEVICE\x10\x05\x12\n" +
 	"\n" +
-	"\x06RESUME\x10\x062X\n" +
+	"\x06RESUME\x10\x06\x12\x13\n" +
+	"\x0fSET_REPLAY_GAIN\x10\a2X\n" +
 	"\x10SatelliteService\x12D\n" +
 	"\aConnect\x12\x1b.satellite.SatelliteMessage\x1a\x18.satellite.ServerMessage(\x010\x01B&Z$varakh.de/subsd/internal/satellitepbb\x06proto3"
 
 var (
-	file_satellite_proto_rawDescOnce sync.Once
-	file_satellite_proto_rawDescData []byte
+	file_proto_satellite_proto_rawDescOnce sync.Once
+	file_proto_satellite_proto_rawDescData []byte
 )
 
-func file_satellite_proto_rawDescGZIP() []byte {
-	file_satellite_proto_rawDescOnce.Do(func() {
-		file_satellite_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_satellite_proto_rawDesc), len(file_satellite_proto_rawDesc)))
+func file_proto_satellite_proto_rawDescGZIP() []byte {
+	file_proto_satellite_proto_rawDescOnce.Do(func() {
+		file_proto_satellite_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_satellite_proto_rawDesc), len(file_proto_satellite_proto_rawDesc)))
 	})
-	return file_satellite_proto_rawDescData
+	return file_proto_satellite_proto_rawDescData
 }
 
-var file_satellite_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_satellite_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_satellite_proto_goTypes = []any{
+var file_proto_satellite_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_proto_satellite_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_satellite_proto_goTypes = []any{
 	(Status)(0),              // 0: satellite.Status
 	(CommandType)(0),         // 1: satellite.CommandType
 	(*SatelliteMessage)(nil), // 2: satellite.SatelliteMessage
@@ -895,7 +910,7 @@ var file_satellite_proto_goTypes = []any{
 	(*Command)(nil),          // 10: satellite.Command
 	(*RequestDevices)(nil),   // 11: satellite.RequestDevices
 }
-var file_satellite_proto_depIdxs = []int32{
+var file_proto_satellite_proto_depIdxs = []int32{
 	3,  // 0: satellite.SatelliteMessage.registration:type_name -> satellite.Registration
 	6,  // 1: satellite.SatelliteMessage.heartbeat:type_name -> satellite.Heartbeat
 	5,  // 2: satellite.SatelliteMessage.state:type_name -> satellite.PlayerState
@@ -916,19 +931,19 @@ var file_satellite_proto_depIdxs = []int32{
 	0,  // [0:11] is the sub-list for field type_name
 }
 
-func init() { file_satellite_proto_init() }
-func file_satellite_proto_init() {
-	if File_satellite_proto != nil {
+func init() { file_proto_satellite_proto_init() }
+func file_proto_satellite_proto_init() {
+	if File_proto_satellite_proto != nil {
 		return
 	}
-	file_satellite_proto_msgTypes[0].OneofWrappers = []any{
+	file_proto_satellite_proto_msgTypes[0].OneofWrappers = []any{
 		(*SatelliteMessage_Registration)(nil),
 		(*SatelliteMessage_Heartbeat)(nil),
 		(*SatelliteMessage_State)(nil),
 		(*SatelliteMessage_Devices)(nil),
 		(*SatelliteMessage_TrackEnded)(nil),
 	}
-	file_satellite_proto_msgTypes[7].OneofWrappers = []any{
+	file_proto_satellite_proto_msgTypes[7].OneofWrappers = []any{
 		(*ServerMessage_Command)(nil),
 		(*ServerMessage_RequestDevices)(nil),
 	}
@@ -936,18 +951,18 @@ func file_satellite_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_satellite_proto_rawDesc), len(file_satellite_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_satellite_proto_rawDesc), len(file_proto_satellite_proto_rawDesc)),
 			NumEnums:      2,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_satellite_proto_goTypes,
-		DependencyIndexes: file_satellite_proto_depIdxs,
-		EnumInfos:         file_satellite_proto_enumTypes,
-		MessageInfos:      file_satellite_proto_msgTypes,
+		GoTypes:           file_proto_satellite_proto_goTypes,
+		DependencyIndexes: file_proto_satellite_proto_depIdxs,
+		EnumInfos:         file_proto_satellite_proto_enumTypes,
+		MessageInfos:      file_proto_satellite_proto_msgTypes,
 	}.Build()
-	File_satellite_proto = out.File
-	file_satellite_proto_goTypes = nil
-	file_satellite_proto_depIdxs = nil
+	File_proto_satellite_proto = out.File
+	file_proto_satellite_proto_goTypes = nil
+	file_proto_satellite_proto_depIdxs = nil
 }

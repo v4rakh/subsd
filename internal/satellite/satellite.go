@@ -86,6 +86,7 @@ const (
 	CmdSetVolume                         // 4
 	CmdSetAudioDevice                    // 5
 	CmdResume                            // 6
+	CmdSetReplayGain                     // 7
 )
 
 // Command is the instruction sent from the server to a satellite.
@@ -97,10 +98,11 @@ type Command struct {
 	Device   string  // CmdSetAudioDevice
 	// Track metadata — populated for CmdPlay so the satellite can log and
 	// present meaningful track info without a Subsonic connection.
-	ID     string // CmdPlay
-	Title  string // CmdPlay
-	Artist string // CmdPlay
-	Album  string // CmdPlay
+	ID         string // CmdPlay
+	Title      string // CmdPlay
+	Artist     string // CmdPlay
+	Album      string // CmdPlay
+	ReplayGain string // CmdSetReplayGain: "no", "track", or "album"
 }
 
 // DefaultHeartbeatInterval is how often a satellite client sends heartbeats.

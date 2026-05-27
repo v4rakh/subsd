@@ -308,6 +308,25 @@ var remoteCommand = &cli.Command{
 			},
 		},
 		{
+			Name:      "replaygain",
+			Usage:     "Set ReplayGain mode (no|track|album)",
+			ArgsUsage: "<mode>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				mode, err := requireArg(cmd, "mode")
+				if err != nil {
+					return err
+				}
+				if mode != "no" && mode != "track" && mode != "album" {
+					return fmt.Errorf("invalid mode %q: must be no, track, or album", mode)
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				return c.post(ctx, "/api/v1/replaygain", map[string]string{"mode": mode})
+			},
+		},
+		{
 			Name:  "state",
 			Usage: "Print current player state as JSON",
 			Action: func(ctx context.Context, cmd *cli.Command) error {

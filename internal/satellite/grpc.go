@@ -606,14 +606,15 @@ func playbackStateToPB(ps PlaybackState) *satellitepb.PlayerState {
 
 func cmdToPB(cmd Command) *satellitepb.ServerMessage {
 	pbCmd := &satellitepb.Command{
-		Url:      cmd.URL,
-		Position: cmd.Position,
-		Volume:   int32(cmd.Volume), //nolint:gosec
-		Device:   cmd.Device,
-		Id:       cmd.ID,
-		Title:    cmd.Title,
-		Artist:   cmd.Artist,
-		Album:    cmd.Album,
+		Url:        cmd.URL,
+		Position:   cmd.Position,
+		Volume:     int32(cmd.Volume), //nolint:gosec
+		Device:     cmd.Device,
+		Id:         cmd.ID,
+		Title:      cmd.Title,
+		Artist:     cmd.Artist,
+		Album:      cmd.Album,
+		ReplayGain: cmd.ReplayGain,
 	}
 	switch cmd.Type {
 	case CmdPlay:
@@ -630,6 +631,8 @@ func cmdToPB(cmd Command) *satellitepb.ServerMessage {
 		pbCmd.Type = satellitepb.CommandType_SET_AUDIO_DEVICE
 	case CmdResume:
 		pbCmd.Type = satellitepb.CommandType_RESUME
+	case CmdSetReplayGain:
+		pbCmd.Type = satellitepb.CommandType_SET_REPLAY_GAIN
 	}
 	return &satellitepb.ServerMessage{
 		Payload: &satellitepb.ServerMessage_Command{Command: pbCmd},
@@ -638,14 +641,15 @@ func cmdToPB(cmd Command) *satellitepb.ServerMessage {
 
 func pbToCommand(c *satellitepb.Command) Command {
 	cmd := Command{
-		URL:      c.GetUrl(),
-		Position: c.GetPosition(),
-		Volume:   int(c.GetVolume()),
-		Device:   c.GetDevice(),
-		ID:       c.GetId(),
-		Title:    c.GetTitle(),
-		Artist:   c.GetArtist(),
-		Album:    c.GetAlbum(),
+		URL:        c.GetUrl(),
+		Position:   c.GetPosition(),
+		Volume:     int(c.GetVolume()),
+		Device:     c.GetDevice(),
+		ID:         c.GetId(),
+		Title:      c.GetTitle(),
+		Artist:     c.GetArtist(),
+		Album:      c.GetAlbum(),
+		ReplayGain: c.GetReplayGain(),
 	}
 	switch c.GetType() {
 	case satellitepb.CommandType_PLAY:
@@ -662,6 +666,8 @@ func pbToCommand(c *satellitepb.Command) Command {
 		cmd.Type = CmdSetAudioDevice
 	case satellitepb.CommandType_RESUME:
 		cmd.Type = CmdResume
+	case satellitepb.CommandType_SET_REPLAY_GAIN:
+		cmd.Type = CmdSetReplayGain
 	}
 	return cmd
 }

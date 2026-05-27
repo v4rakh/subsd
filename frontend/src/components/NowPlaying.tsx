@@ -1,7 +1,18 @@
 import { apiUrl, apiFetch } from '../api';
 import type { PlayerControls } from '../hooks/usePlayer';
 import type { Theme } from '../hooks/useTheme';
-import type { Track, PlayerState, SatelliteInfo, SatelliteDevice } from '../types';
+import {
+	SCROBBLE_OK,
+	REPLAY_GAIN_OFF,
+	REPLAY_GAIN_TRACK,
+	REPLAY_GAIN_MODES,
+	type Track,
+	type PlayerState,
+	type ReplayGainMode,
+	type ScrobbleStatus,
+	type SatelliteInfo,
+	type SatelliteDevice
+} from '../types';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { fmtDuration, fmtAudioMeta } from '@/lib/format';
@@ -21,7 +32,8 @@ import {
 	Check,
 	Radio,
 	RefreshCw,
-	Satellite
+	Satellite,
+	Gauge
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +58,7 @@ interface Props {
 	onThemeToggle: () => void;
 	onOpenSearch: () => void;
 	onRefreshCache: () => void;
+	setReplayGain: (mode: ReplayGainMode) => void;
 }
 
 function TrackInfo({ track }: { track: Track | null }) {
@@ -79,10 +92,10 @@ function ConnectionDot({ connected }: { connected: boolean }) {
 	);
 }
 
-function ScrobbleDot({ lastScrobble }: { lastScrobble?: string }) {
+function ScrobbleDot({ lastScrobble }: { lastScrobble?: ScrobbleStatus }) {
 	const { t } = useTranslation();
 	if (!lastScrobble) return null;
-	const ok = lastScrobble === 'ok';
+	const ok = lastScrobble === SCROBBLE_OK;
 	return (
 		<div className="relative group shrink-0 cursor-default p-2">
 			<Radio className={cn('size-3', ok ? 'text-green' : 'text-red')} />
@@ -228,6 +241,60 @@ function SatellitePopover({
 	);
 }
 
+function ReplayGainPopover({ mode, onChange }: { mode: string; onChange: (mode: string) => void }) {
+	const { t } = useTranslation();
+	const [open, setOpen] = useState(false);
+	const ref = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!open) return;
+		const handler = (e: MouseEvent) => {
+			if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+		};
+		document.addEventListener('mousedown', handler);
+		return () => document.removeEventListener('mousedown', handler);
+	}, [open]);
+
+	const label = (m: string) =>
+		m === REPLAY_GAIN_OFF
+			? t('nowPlaying.replayGainOff')
+			: m === REPLAY_GAIN_TRACK
+				? t('nowPlaying.replayGainTrack')
+				: t('nowPlaying.replayGainAlbum');
+
+	return (
+		<div ref={ref} className="relative shrink-0">
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				className={cn('text-dim', open && 'text-brand bg-muted', mode !== REPLAY_GAIN_OFF && 'text-brand')}
+				onClick={() => setOpen((o) => !o)}
+				title={t('nowPlaying.replayGain')}>
+				<Gauge className="size-4" />
+			</Button>
+			{open && (
+				<div className="absolute bottom-full right-0 mb-2 min-w-[140px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
+					{REPLAY_GAIN_MODES.map((m) => (
+						<button
+							key={m}
+							className={cn(
+								'w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-bg2 transition-colors',
+								mode === m ? 'text-brand' : 'text-text'
+							)}
+							onClick={() => {
+								onChange(m);
+								setOpen(false);
+							}}>
+							<span className="flex-1">{label(m)}</span>
+							{mode === m && <Check className="size-3.5 shrink-0" />}
+						</button>
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
 export function NowPlaying({
 	playerState,
 	controls,
@@ -236,10 +303,12 @@ export function NowPlaying({
 	satellites,
 	onThemeToggle,
 	onOpenSearch,
-	onRefreshCache
+	onRefreshCache,
+	setReplayGain
 }: Props) {
 	const { t } = useTranslation();
-	const { playing, currentIdx, queue, position, duration, volume, shuffle, repeat, lastScrobble } = playerState;
+	const { playing, currentIdx, queue, position, duration, volume, shuffle, repeat, lastScrobble, replayGain } =
+		playerState;
 	const track = queue[currentIdx] ?? null;
 	const isDesktop = useIsDesktop();
 
@@ -353,7 +422,7 @@ export function NowPlaying({
 					</div>
 				</div>
 
-				{/* Audio device + satellite + search + theme + dot — right column */}
+				{/* Audio device + satellite + replaygain + search + theme + dot — right column */}
 				<div className="flex items-center justify-end gap-2 pr-2!">
 					{activeSatellite && (
 						<AudioDevicePopover
@@ -368,6 +437,7 @@ export function NowPlaying({
 						noActiveSatellite={noActiveSatellite}
 						onSelect={handleSelectSatellite}
 					/>
+					<ReplayGainPopover mode={replayGain ?? REPLAY_GAIN_OFF} onChange={setReplayGain} />
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -414,6 +484,7 @@ export function NowPlaying({
 						noActiveSatellite={noActiveSatellite}
 						onSelect={handleSelectSatellite}
 					/>
+					<ReplayGainPopover mode={replayGain ?? REPLAY_GAIN_OFF} onChange={setReplayGain} />
 					<Button
 						variant="ghost"
 						size="icon-sm"

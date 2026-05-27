@@ -123,6 +123,8 @@ func (s *InProcess) Send(cmd Command) error {
 		s.player.SetVolume(cmd.Volume)
 	case CmdSetAudioDevice:
 		return s.player.SetAudioDevice(cmd.Device)
+	case CmdSetReplayGain:
+		s.player.SetReplayGain(cmd.ReplayGain)
 	}
 	return nil
 }

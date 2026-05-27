@@ -243,6 +243,7 @@ export default function App() {
 					else setMobileTab('search');
 				}}
 				onRefreshCache={() => apiFetch('/api/v1/cache', { method: 'POST' }).catch(() => { /* empty */ })}
+				setReplayGain={controls.setReplayGain}
 			/>
 
 			{/* Mobile tab bar */}

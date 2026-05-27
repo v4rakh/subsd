@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -24,7 +25,7 @@ import (
 	"varakh.de/subsd/web"
 )
 
-const version = "0.2.0"
+const version = "0.3.0"
 
 // ── Flag names ────────────────────────────────────────────────────────────────
 
@@ -421,6 +422,25 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 			log.Info().Int("tracks", len(ps.Queue)).Str("file", stateFile).Msg("state restored")
 		}
 
+		// Autosave: debounce state saves on every player change so queue
+		// mutations survive crashes (not just graceful shutdown).
+		var (
+			autosaveMu    sync.Mutex
+			autosaveTimer *time.Timer
+		)
+		pl.OnChange(func(state player.State) {
+			autosaveMu.Lock()
+			defer autosaveMu.Unlock()
+			if autosaveTimer != nil {
+				autosaveTimer.Stop()
+			}
+			autosaveTimer = time.AfterFunc(5*time.Second, func() {
+				if err := persistence.Save(stateFile, persistenceStateFrom(state)); err != nil {
+					log.Error().Err(err).Str("file", stateFile).Msg("autosave failed")
+				}
+			})
+		})
+
 		sc = subClient
 		pc = pl
 
@@ -466,17 +486,7 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 	log.Info().Msg("shutting down")
 
 	if pl != nil {
-		state := pl.GetState()
-		ps := persistence.State{
-			Queue:      state.Queue,
-			CurrentIdx: state.CurrentIdx,
-			Volume:     state.Volume,
-			Shuffle:    state.Shuffle,
-			Repeat:     state.Repeat,
-			Position:   state.Position,
-			SavedAt:    time.Now(),
-		}
-		if err := persistence.Save(stateFile, ps); err != nil {
+		if err := persistence.Save(stateFile, persistenceStateFrom(pl.GetState())); err != nil {
 			log.Error().Err(err).Str("file", stateFile).Msg("failed to save state")
 		} else {
 			log.Info().Str("file", stateFile).Msg("state saved")
@@ -580,6 +590,19 @@ func parseSameSite(s string) http.SameSite {
 		return http.SameSiteNoneMode
 	default:
 		return http.SameSiteStrictMode
+	}
+}
+
+// persistenceStateFrom converts a player state snapshot to a persistence record.
+func persistenceStateFrom(s player.State) persistence.State {
+	return persistence.State{
+		Queue:      s.Queue,
+		CurrentIdx: s.CurrentIdx,
+		Volume:     s.Volume,
+		Shuffle:    s.Shuffle,
+		Repeat:     s.Repeat,
+		Position:   s.Position,
+		SavedAt:    time.Now(),
 	}
 }
 

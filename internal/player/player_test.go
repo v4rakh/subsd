@@ -410,13 +410,13 @@ func TestToggleRepeat(t *testing.T) {
 
 func TestSetLastScrobble(t *testing.T) {
 	p, _ := newTestPlayer()
-	p.SetLastScrobble("ok")
-	if s := p.GetState().LastScrobble; s != "ok" {
-		t.Errorf("LastScrobble: got %q, want %q", s, "ok")
+	p.SetLastScrobble(ScrobbleOK)
+	if s := p.GetState().LastScrobble; s != ScrobbleOK {
+		t.Errorf("LastScrobble: got %q, want %q", s, ScrobbleOK)
 	}
-	p.SetLastScrobble("error")
-	if s := p.GetState().LastScrobble; s != "error" {
-		t.Errorf("LastScrobble: got %q, want %q", s, "error")
+	p.SetLastScrobble(ScrobbleError)
+	if s := p.GetState().LastScrobble; s != ScrobbleError {
+		t.Errorf("LastScrobble: got %q, want %q", s, ScrobbleError)
 	}
 }
 

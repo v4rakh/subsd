@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from './useWebSocket';
-import type { PlayerState, SatelliteInfo, WsMessage } from '../types';
+import { REPLAY_GAIN_OFF } from '../types';
+import type { PlayerState, ReplayGainMode, SatelliteInfo, WsMessage } from '../types';
 import { apiFetch } from '../api';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +14,8 @@ const DEFAULT_STATE: PlayerState = {
 	duration: 0,
 	volume: 100,
 	shuffle: false,
-	repeat: false
+	repeat: false,
+	replayGain: REPLAY_GAIN_OFF
 };
 
 async function api(method: string, path: string, body?: unknown): Promise<void> {
@@ -42,6 +44,7 @@ export interface PlayerControls {
 	enqueueAlbum: (id: string) => void;
 	playPlaylist: (id: string) => void;
 	enqueuePlaylist: (id: string) => void;
+	setReplayGain: (mode: ReplayGainMode) => void;
 }
 
 export function usePlayer(): {
@@ -91,7 +94,8 @@ export function usePlayer(): {
 			enqueueSong: (id) => api('POST', `/api/v1/queue/song/${id}`),
 			enqueueAlbum: (id) => api('POST', `/api/v1/queue/album/${id}`),
 			playPlaylist: (id) => api('POST', `/api/v1/play/playlist/${id}`),
-			enqueuePlaylist: (id) => api('POST', `/api/v1/queue/playlist/${id}`)
+			enqueuePlaylist: (id) => api('POST', `/api/v1/queue/playlist/${id}`),
+			setReplayGain: (mode) => api('POST', '/api/v1/replaygain', { mode })
 		}),
 		[]
 	);

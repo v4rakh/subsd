@@ -154,6 +154,8 @@ func (f *fakePlayer) SetAudioDevice(name string) error {
 	return nil
 }
 
+func (f *fakePlayer) SetReplayGain(mode string) { f.record("replaygain:" + mode) }
+
 func (f *fakePlayer) called(name string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -1111,4 +1113,3 @@ func TestEnqueueSong_TrackConversion(t *testing.T) {
 		t.Errorf("audio metadata not forwarded: %+v", tr)
 	}
 }
-

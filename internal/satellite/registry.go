@@ -230,6 +230,19 @@ func (r *Registry) RefreshDevices(satName string, _ time.Duration) error {
 	return nil
 }
 
+// BroadcastAll sends a command to every registered satellite, ignoring errors.
+func (r *Registry) BroadcastAll(cmd Command) {
+	r.mu.RLock()
+	satellites := make([]Satellite, 0, len(r.satellites))
+	for _, s := range r.satellites {
+		satellites = append(satellites, s)
+	}
+	r.mu.RUnlock()
+	for _, s := range satellites {
+		_ = s.Send(cmd)
+	}
+}
+
 // notifyList broadcasts the current satellite list to registered listeners.
 func (r *Registry) notifyList() {
 	r.mu.RLock()

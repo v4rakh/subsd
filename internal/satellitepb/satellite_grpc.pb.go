@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.1
-// source: satellite.proto
+// source: proto/satellite.proto
 
 package satellitepb
 
@@ -115,5 +115,5 @@ var SatelliteService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "satellite.proto",
+	Metadata: "proto/satellite.proto",
 }

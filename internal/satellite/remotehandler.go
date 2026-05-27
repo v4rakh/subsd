@@ -85,6 +85,9 @@ func (h *RemoteHandler) HandleCommand(cmd Command) {
 		if err := h.player.SetAudioDevice(cmd.Device); err != nil {
 			log.Error().Err(err).Str("device", cmd.Device).Msg("satellite/remote: SetAudioDevice failed")
 		}
+	case CmdSetReplayGain:
+		log.Info().Str("mode", cmd.ReplayGain).Msg("satellite/remote: replaygain set")
+		h.player.SetReplayGain(cmd.ReplayGain)
 	}
 }
 

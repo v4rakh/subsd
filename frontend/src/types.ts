@@ -1,5 +1,18 @@
 // Domain types — mirror the JSON shapes from player/player.go and subsonic/client.go
 
+// Scrobble outcome values (mirrors player.ScrobbleOK / ScrobbleError in Go).
+export const SCROBBLE_OK = 'ok';
+export const SCROBBLE_ERROR = 'error';
+export const SCROBBLE_STATUSES = [SCROBBLE_OK, SCROBBLE_ERROR] as const;
+export type ScrobbleStatus = (typeof SCROBBLE_STATUSES)[number];
+
+// ReplayGain mode values (mirrors player.ReplayGainOff / Track / Album in Go).
+export const REPLAY_GAIN_OFF = 'no';
+export const REPLAY_GAIN_TRACK = 'track';
+export const REPLAY_GAIN_ALBUM = 'album';
+export const REPLAY_GAIN_MODES = [REPLAY_GAIN_OFF, REPLAY_GAIN_TRACK, REPLAY_GAIN_ALBUM] as const;
+export type ReplayGainMode = (typeof REPLAY_GAIN_MODES)[number];
+
 export interface Track {
 	id: string;
 	title: string;
@@ -23,7 +36,8 @@ export interface PlayerState {
 	volume: number;
 	shuffle: boolean;
 	repeat: boolean;
-	lastScrobble?: string; // "", "ok", or "error"
+	lastScrobble?: ScrobbleStatus;
+	replayGain?: ReplayGainMode;
 }
 
 export interface Artist {
