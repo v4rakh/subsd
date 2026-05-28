@@ -239,6 +239,10 @@ Major updates undergo manual review.
      - `cmd/main.go`: `Version`
    - Make sure `make clean dependencies build checkstyle audit` is fine
    - Make sure `nix build` is fine (you need `nix` for it, update checksums in `flake.nix` if it fails)
+      ```shell
+      nix build .#packages.x86_64-linux.default -L
+      nix build .#packages.aarch64-linux.default -L
+      ```
    - Use `release/` as branch prefix and `release: prepare XYZ` as commit message
 2. Merge to trunk
 3. Trigger the release job the semantic version which is inside the main trunk (use `v` prefix!)

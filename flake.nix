@@ -17,7 +17,6 @@
       systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "aarch64-darwin"
       ];
 
       perSystem =
@@ -31,7 +30,7 @@
 
             nativeBuildInputs = with pkgs; [
               nodejs_24
-              pnpm_10
+              pnpm_11
               pnpmConfigHook
             ];
 
@@ -44,8 +43,9 @@
                 src
                 pnpmInstallFlags
                 ;
+              pnpm = pkgs.pnpm_11;
               fetcherVersion = 3;
-              hash = "sha256-jwwpjIAmIoTmKbTGjY8BCqeA9PbA2UvJKywJxnYc8Sw=";
+              hash = "sha256-Wes4v84f42AdIQE8M8ybFCD0QWAOwmiJyWWZt1p5hOw=";
             };
 
             buildPhase = ''
@@ -70,7 +70,7 @@
             inherit version;
             src = ./.;
             doCheck = false;
-            vendorHash = "sha256-caJMOPpPOfix+saH61Ka0o24FDq8QPkXWc/NdbA7CJA=";
+            vendorHash = "sha256-PHV4lA5hSN8pMK2WmZk7rPw1GlREyJZ/vOrIeb6zBHk=";
             ldflags = [
               "-s"
               "-w"
