@@ -202,10 +202,10 @@ in
       description = "Log level (SUBSD_LOG_LEVEL). Defaults to info when unset.";
     };
 
-    stateFile = lib.mkOption {
+    dataDir = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Path to the state persistence file (SUBSD_STATE_FILE). Defaults to \$XDG_STATE_HOME/subsd/state.json when unset.";
+      description = "Path to the data directory where subsd stores its state (SUBSD_DATA_DIR). Defaults to \$XDG_STATE_HOME/subsd when unset.";
     };
 
     readTimeout = lib.mkOption {
@@ -355,8 +355,8 @@ in
         // lib.optionalAttrs (cfg.tlsKey != null) { SUBSD_TLS_KEY = toString cfg.tlsKey; }
         // lib.optionalAttrs (cfg.logLevel != null) { SUBSD_LOG_LEVEL = cfg.logLevel; }
         // {
-          SUBSD_STATE_FILE =
-            if cfg.stateFile != null then cfg.stateFile else "${config.xdg.stateHome}/subsd/state.json";
+          SUBSD_DATA_DIR =
+            if cfg.dataDir != null then cfg.dataDir else "${config.xdg.stateHome}/subsd";
         }
         // lib.optionalAttrs (cfg.readTimeout != null) { SUBSD_READ_TIMEOUT = cfg.readTimeout; }
         // lib.optionalAttrs (cfg.cacheLibraryTtl != null) {

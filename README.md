@@ -77,14 +77,14 @@ All flags can also be set via environment variables (shown in the tables below) 
 
 #### General
 
-| Flag             | Environment          | Default                      | Description                                                                                        |
-| ---------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `--addr`         | `SUBSD_ADDR`         | `:8080`                      | Address the web UI listens on                                                                      |
-| `--log-level`    | `SUBSD_LOG_LEVEL`    | `info`                       | Log verbosity: `debug`, `info`, `warn`, or `error`                                                 |
-| `--read-timeout` | `SUBSD_READ_TIMEOUT` | `60s`                        | HTTP server read timeout                                                                           |
-| `--mode`         | `SUBSD_MODE`         | `full`                       | Operating mode: `full` (API + frontend), `daemon` (API only), `frontend` (UI only), or `satellite` |
-| `--url`          | `SUBSD_URL`          | —                            | Base URL of the API server; required in `frontend` mode                                            |
-| `--state-file`   | `SUBSD_STATE_FILE`   | _(platform default)_         | Path to the playback state persistence file                                                        |
+| Flag             | Environment          | Default              | Description                                                                                        |
+| ---------------- | -------------------- | -------------------- | -------------------------------------------------------------------------------------------------- |
+| `--addr`         | `SUBSD_ADDR`         | `:8080`              | Address the web UI listens on                                                                      |
+| `--log-level`    | `SUBSD_LOG_LEVEL`    | `info`               | Log verbosity: `debug`, `info`, `warn`, or `error`                                                 |
+| `--read-timeout` | `SUBSD_READ_TIMEOUT` | `60s`                | HTTP server read timeout                                                                           |
+| `--mode`         | `SUBSD_MODE`         | `full`               | Operating mode: `full` (API + frontend), `daemon` (API only), `frontend` (UI only), or `satellite` |
+| `--url`          | `SUBSD_URL`          | —                    | Base URL of the API server; required in `frontend` mode                                            |
+| `--data-dir`     | `SUBSD_DATA_DIR`     | _(platform default)_ | Path to the data directory (state is stored here)                                                  |
 
 #### Authentication & TLS (HTTP)
 
@@ -123,13 +123,13 @@ optional and independent — use neither, either, or both.
 | Flag                                   | Environment                                | Default      | Description                                                                                      |
 | -------------------------------------- | ------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
 | `--grpc-addr`                          | `SUBSD_GRPC_ADDR`                          | `:9090`      | gRPC listen address (daemon/full) or dial address (satellite)                                    |
-| `--satellite-name`                     | `SUBSD_SATELLITE_NAME`                     | _(hostname)_ | Stable name for this satellite (satellite mode)                                                  |
 | `--grpc-tls-cert`                      | `SUBSD_GRPC_TLS_CERT`                      | —            | TLS certificate for the gRPC server (daemon/full modes)                                          |
 | `--grpc-tls-key`                       | `SUBSD_GRPC_TLS_KEY`                       | —            | TLS private key for the gRPC server (daemon/full modes)                                          |
 | `--grpc-tls`                           | `SUBSD_GRPC_TLS`                           | `false`      | Dial gRPC with TLS using system root CAs (satellite mode)                                        |
 | `--grpc-tls-ca`                        | `SUBSD_GRPC_TLS_CA`                        | —            | CA certificate for verifying the gRPC server; implies TLS; use for self-signed certs (satellite) |
 | `--grpc-token`                         | `SUBSD_GRPC_TOKEN`                         | —            | Shared secret for satellite authentication (sent as `x-subsd-token`); used by both sides         |
 | `--grpc-token-file`                    | `SUBSD_GRPC_TOKEN_FILE`                    | —            | Read gRPC shared secret from a file instead of `--grpc-token`                                    |
+| `--satellite-name`                     | `SUBSD_SATELLITE_NAME`                     | _(hostname)_ | Stable name for this satellite (satellite mode)                                                  |
 | `--satellite-heartbeat-timeout`        | `SUBSD_SATELLITE_HEARTBEAT_TIMEOUT`        | `15s`        | How long a satellite may be silent before the server disconnects it (daemon/full)                |
 | `--satellite-heartbeat-check-interval` | `SUBSD_SATELLITE_HEARTBEAT_CHECK_INTERVAL` | `5s`         | How often the server checks for satellite heartbeat timeouts (daemon/full)                       |
 | `--satellite-heartbeat-interval`       | `SUBSD_SATELLITE_HEARTBEAT_INTERVAL`       | `5s`         | How often a satellite sends heartbeats upstream (satellite mode)                                 |
@@ -238,10 +238,10 @@ Major updates undergo manual review.
      - `cmd/main.go`: `Version`
    - Make sure `make clean dependencies build checkstyle audit` is fine
    - Make sure `nix build` is fine (you need `nix` for it, update checksums in `flake.nix` if it fails)
-      ```shell
-      nix build .#packages.x86_64-linux.default -L
-      nix build .#packages.aarch64-linux.default -L
-      ```
+     ```shell
+     nix build .#packages.x86_64-linux.default -L
+     nix build .#packages.aarch64-linux.default -L
+     ```
    - Use `release/` as branch prefix and `release: prepare XYZ` as commit message
 2. Merge to trunk
 3. Trigger the release job the semantic version which is inside the main trunk (use `v` prefix!)

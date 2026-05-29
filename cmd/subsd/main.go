@@ -43,7 +43,7 @@ const (
 	flagSubsonicPassFile = "subsonic-pass-file"
 	flagToken            = "token"
 	flagTokenFile        = "token-file"
-	flagStateFile        = "state-file"
+	flagDataDir          = "data-dir"
 	flagURL              = "url"
 	flagCORSOrigins      = "cors-origins"
 	flagCookieSameSite   = "cookie-samesite"
@@ -85,7 +85,7 @@ const (
 	envSubsonicPassFile = "SUBSD_SUBSONIC_PASS_FILE" //nolint:gosec
 	envToken            = "SUBSD_TOKEN"
 	envTokenFile        = "SUBSD_TOKEN_FILE" //nolint:gosec
-	envStateFile        = "SUBSD_STATE_FILE"
+	envDataDir          = "SUBSD_DATA_DIR"
 	envURL              = "SUBSD_URL"
 	envCORSOrigins      = "SUBSD_CORS_ORIGINS"
 	envCookieSameSite   = "SUBSD_COOKIE_SAMESITE"
@@ -191,10 +191,10 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Sources: cli.EnvVars(envTokenFile),
 	},
 	&cli.StringFlag{
-		Name:    flagStateFile,
-		Usage:   "Path to the state persistence file",
-		Value:   persistence.DefaultPath(),
-		Sources: cli.EnvVars(envStateFile),
+		Name:    flagDataDir,
+		Usage:   "Path to the data directory (state is stored here)",
+		Value:   persistence.DefaultDir(),
+		Sources: cli.EnvVars(envDataDir),
 	},
 	&cli.StringFlag{
 		Name:    flagURL,
@@ -360,11 +360,11 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	var (
-		sc        server.SubsonicClient
-		pc        server.PlayerController
-		pl        *player.Player
-		stateFile string
-		reg       *satellite.Registry
+		sc      server.SubsonicClient
+		pc      server.PlayerController
+		pl      *player.Player
+		dataDir string
+		reg     *satellite.Registry
 	)
 
 	if mode == server.ModeFrontend {
@@ -374,7 +374,7 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	if mode.ServesAPI() {
-		stateFile = cmd.String(flagStateFile)
+		dataDir = cmd.String(flagDataDir)
 
 		subsonicHost := cmd.String(flagSubsonicHost)
 		if subsonicHost == "" {
@@ -419,7 +419,7 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		inProc := satellite.NewInProcess(satName, pl)
 		reg.Register(inProc)
 
-		if ps, err := persistence.Load(stateFile); err == nil {
+		if ps, err := persistence.Load(dataDir); err == nil {
 			pl.RestoreState(ps.Queue, ps.CurrentIdx, ps.Volume, ps.Shuffle, ps.Repeat, ps.Position, ps.ReplayGain)
 			if ps.AudioDevice != "" {
 				if err := pl.SetAudioDevice(ps.AudioDevice); err != nil {
@@ -429,7 +429,7 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 			if ps.PreferredSatellite != "" {
 				reg.SetPreferredSatellite(ps.PreferredSatellite)
 			}
-			log.Info().Int("tracks", len(ps.Queue)).Str("file", stateFile).Msg("state restored")
+			log.Info().Int("tracks", len(ps.Queue)).Str("dir", dataDir).Msg("state restored")
 		}
 
 		// Autosave: persist state on every player change. A 5s debounce
@@ -456,8 +456,8 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 			autosaveMu.Lock()
 			lastSavedAt = time.Now()
 			autosaveMu.Unlock()
-			if err := persistence.Save(stateFile, ps); err != nil {
-				log.Error().Err(err).Str("file", stateFile).Msg("autosave failed")
+			if err := persistence.Save(dataDir, ps); err != nil {
+				log.Error().Err(err).Str("dir", dataDir).Msg("autosave failed")
 			}
 		}
 		pl.OnChange(func(_ player.State) {
@@ -514,10 +514,10 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		if reg != nil {
 			ps.PreferredSatellite = reg.ActiveName()
 		}
-		if err := persistence.Save(stateFile, ps); err != nil {
-			log.Error().Err(err).Str("file", stateFile).Msg("failed to save state")
+		if err := persistence.Save(dataDir, ps); err != nil {
+			log.Error().Err(err).Str("dir", dataDir).Msg("failed to save state")
 		} else {
-			log.Info().Str("file", stateFile).Msg("state saved")
+			log.Info().Str("dir", dataDir).Msg("state saved")
 		}
 	}
 

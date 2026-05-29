@@ -28,14 +28,13 @@ func sampleState() persistence.State {
 
 func TestSaveLoad_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
 
 	want := sampleState()
-	if err := persistence.Save(path, want); err != nil {
+	if err := persistence.Save(dir, want); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
-	got, err := persistence.Load(path)
+	got, err := persistence.Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -64,29 +63,28 @@ func TestSaveLoad_RoundTrip(t *testing.T) {
 
 func TestSave_CreatesIntermediateDirectories(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "deep", "nested", "state.json")
-	if err := persistence.Save(path, sampleState()); err != nil {
+	subdir := filepath.Join(dir, "deep", "nested")
+	if err := persistence.Save(subdir, sampleState()); err != nil {
 		t.Fatalf("Save should create parent dirs: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(filepath.Join(subdir, "state.json")); err != nil {
 		t.Errorf("file not created: %v", err)
 	}
 }
 
 func TestSave_NoTempFileLeft(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := persistence.Save(path, sampleState()); err != nil {
+	if err := persistence.Save(dir, sampleState()); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	// The atomic temp file should be gone after rename.
-	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, "state.json.tmp")); !os.IsNotExist(err) {
 		t.Error("expected .tmp file to be absent after successful Save")
 	}
 }
 
 func TestLoad_FileNotFound(t *testing.T) {
-	_, err := persistence.Load("/nonexistent/path/state.json")
+	_, err := persistence.Load("/nonexistent/path")
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
@@ -94,11 +92,10 @@ func TestLoad_FileNotFound(t *testing.T) {
 
 func TestLoad_CorruptJSON(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := os.WriteFile(path, []byte("not json {{{"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte("not json {{{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := persistence.Load(path)
+	_, err := persistence.Load(dir)
 	if err == nil {
 		t.Fatal("expected error for corrupt JSON")
 	}
@@ -106,11 +103,10 @@ func TestLoad_CorruptJSON(t *testing.T) {
 
 func TestSave_ProducesValidJSON(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
-	if err := persistence.Save(path, sampleState()); err != nil {
+	if err := persistence.Save(dir, sampleState()); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Join(dir, "state.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,13 +118,12 @@ func TestSave_ProducesValidJSON(t *testing.T) {
 
 func TestSave_ZeroPosition_OmittedFromJSON(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "state.json")
 	s := sampleState()
 	s.Position = 0
-	if err := persistence.Save(path, s); err != nil {
+	if err := persistence.Save(dir, s); err != nil {
 		t.Fatal(err)
 	}
-	data, _ := os.ReadFile(path)
+	data, _ := os.ReadFile(filepath.Join(dir, "state.json"))
 	var raw map[string]any
 	json.Unmarshal(data, &raw) //nolint:errcheck
 	if _, found := raw["position"]; found {
