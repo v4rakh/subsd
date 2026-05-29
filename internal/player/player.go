@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"strings"
+
 	"github.com/rs/zerolog/log"
 	"varakh.de/subsd/internal/mpv"
 )
@@ -738,6 +740,10 @@ func (p *Player) handleEvent(conn mpv.IPC, ev mpv.Event) {
 			return
 		}
 		reason, _ := ev.Data["reason"].(string)
+		if reason != "eof" && reason != "stop" {
+			fileErr, _ := ev.Data["file_error"].(string)
+			log.Warn().Str("reason", reason).Str("file_error", fileErr).Msg("player/mpv: end-file unexpected reason")
+		}
 		if reason == "eof" {
 			p.mu.RLock()
 			var completed Track
@@ -958,6 +964,17 @@ func (p *Player) SetAudioDevice(name string) error {
 	return nil
 }
 
+// mpvLogWriter pipes mpv's stderr output into the zerolog logger.
+type mpvLogWriter struct{}
+
+func (mpvLogWriter) Write(p []byte) (int, error) {
+	msg := strings.TrimRight(string(p), "\n\r")
+	if msg != "" {
+		log.Warn().Str("source", "mpv").Msg(msg)
+	}
+	return len(p), nil
+}
+
 // launchMPV starts mpv as a subprocess and waits for the socket file to appear.
 func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
@@ -968,12 +985,13 @@ func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
 		"--no-video",
 		"--idle=yes",
 		"--input-ipc-server="+socketPath,
-		"--really-quiet",
+		"--msg-level=all=warn",
 		"--gapless-audio=yes",
 	)
 	// Ensure mpv dies whenever the parent process exits — including crashes,
 	// panics, and SIGKILL — not only on graceful shutdown.
 	setSysProcAttr(cmd)
+	cmd.Stderr = mpvLogWriter{}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
