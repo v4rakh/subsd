@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
@@ -44,7 +43,6 @@ const (
 	flagSubsonicPassFile = "subsonic-pass-file"
 	flagToken            = "token"
 	flagTokenFile        = "token-file"
-	flagMPVSocket        = "mpv-socket"
 	flagStateFile        = "state-file"
 	flagURL              = "url"
 	flagCORSOrigins      = "cors-origins"
@@ -87,7 +85,6 @@ const (
 	envSubsonicPassFile = "SUBSD_SUBSONIC_PASS_FILE" //nolint:gosec
 	envToken            = "SUBSD_TOKEN"
 	envTokenFile        = "SUBSD_TOKEN_FILE" //nolint:gosec
-	envMPVSocket        = "SUBSD_MPV_SOCKET"
 	envStateFile        = "SUBSD_STATE_FILE"
 	envURL              = "SUBSD_URL"
 	envCORSOrigins      = "SUBSD_CORS_ORIGINS"
@@ -192,12 +189,6 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Name:    flagTokenFile,
 		Usage:   "Path to a file containing the access token (alternative to --token)",
 		Sources: cli.EnvVars(envTokenFile),
-	},
-	&cli.StringFlag{
-		Name:    flagMPVSocket,
-		Usage:   "mpv IPC socket path",
-		Value:   fmt.Sprintf("/tmp/subsd-mpv-%s.sock", uuid.New()),
-		Sources: cli.EnvVars(envMPVSocket),
 	},
 	&cli.StringFlag{
 		Name:    flagStateFile,
@@ -411,7 +402,7 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		}
 		log.Info().Str("host", subsonicHost).Msg("connected to Subsonic server")
 
-		pl, err = player.New(cmd.String(flagMPVSocket))
+		pl, err = player.New()
 		if err != nil {
 			return fmt.Errorf("failed to start player: %w", err)
 		}
@@ -557,7 +548,7 @@ func runSatelliteMode(ctx context.Context, cmd *cli.Command) error {
 	}
 	name := satelliteName(cmd)
 
-	pl, err := player.New(cmd.String(flagMPVSocket))
+	pl, err := player.New()
 	if err != nil {
 		return fmt.Errorf("failed to start player: %w", err)
 	}

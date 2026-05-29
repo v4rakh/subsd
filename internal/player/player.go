@@ -12,6 +12,7 @@ import (
 
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"varakh.de/subsd/internal/mpv"
 )
@@ -187,7 +188,8 @@ func (b *mpvBackend) cancel() {
 }
 
 // New launches mpv, connects to its IPC socket, and returns a ready Player.
-func New(socketPath string) (*Player, error) {
+func New() (*Player, error) {
+	socketPath := fmt.Sprintf("%s/subsd-mpv-%s.sock", os.TempDir(), uuid.New())
 	cmd, err := launchMPV(context.Background(), socketPath)
 	if err != nil {
 		return nil, err

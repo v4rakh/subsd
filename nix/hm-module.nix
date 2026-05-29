@@ -189,13 +189,6 @@ in
       description = "Path to TLS private key file (SUBSD_TLS_KEY). Enables HTTPS when combined with tlsCert.";
     };
 
-    mpvSocket = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "/tmp/subsd-mpv.sock";
-      description = "mpv IPC socket path (SUBSD_MPV_SOCKET). When unset subsd generates a unique UUID-based path per process, which is safe even when multiple instances run as the same user. Set this only if you need a stable, predictable path.";
-    };
-
     logLevel = lib.mkOption {
       type = lib.types.nullOr (
         lib.types.enum [
@@ -360,7 +353,6 @@ in
         // lib.optionalAttrs (cfg.tokenFile != null) { SUBSD_TOKEN_FILE = toString cfg.tokenFile; }
         // lib.optionalAttrs (cfg.tlsCert != null) { SUBSD_TLS_CERT = toString cfg.tlsCert; }
         // lib.optionalAttrs (cfg.tlsKey != null) { SUBSD_TLS_KEY = toString cfg.tlsKey; }
-        // lib.optionalAttrs (cfg.mpvSocket != null) { SUBSD_MPV_SOCKET = cfg.mpvSocket; }
         // lib.optionalAttrs (cfg.logLevel != null) { SUBSD_LOG_LEVEL = cfg.logLevel; }
         // {
           SUBSD_STATE_FILE =

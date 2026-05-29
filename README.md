@@ -85,7 +85,6 @@ All flags can also be set via environment variables (shown in the tables below) 
 | `--mode`         | `SUBSD_MODE`         | `full`                       | Operating mode: `full` (API + frontend), `daemon` (API only), `frontend` (UI only), or `satellite` |
 | `--url`          | `SUBSD_URL`          | —                            | Base URL of the API server; required in `frontend` mode                                            |
 | `--state-file`   | `SUBSD_STATE_FILE`   | _(platform default)_         | Path to the playback state persistence file                                                        |
-| `--mpv-socket`   | `SUBSD_MPV_SOCKET`   | `/tmp/subsd-mpv-<uuid>.sock` | mpv IPC socket path                                                                                |
 
 #### Authentication & TLS (HTTP)
 
