@@ -115,6 +115,12 @@ other, not both.
 | `--cache-coverart-ttl`     | `SUBSD_CACHE_COVERART_TTL`     | `24h`   | TTL for cover art cache entries                                                    |
 | `--cache-refresh-interval` | `SUBSD_CACHE_REFRESH_INTERVAL` | `1h`    | How often to refresh the full library cache in the background (0 = on-demand only) |
 
+#### Playback
+
+| Flag              | Environment           | Default | Description                                                                                                                                                     |
+| ----------------- | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--gapless-audio` | `SUBSD_GAPLESS_AUDIO` | `weak`  | Gapless audio mode: `yes` (always gapless), `weak` (only when audio format is compatible between tracks), `no` (disabled). Requires a daemon restart to change. |
+
 #### Satellites (gRPC)
 
 These flags control the gRPC server (daemon/full mode) and client (satellite mode). TLS and the shared token are both

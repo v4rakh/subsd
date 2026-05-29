@@ -66,6 +66,8 @@ const (
 	flagSatelliteHeartbeatInterval      = "satellite-heartbeat-interval"
 	flagSatelliteStateInterval          = "satellite-state-interval"
 	flagSatelliteReconnectInterval      = "satellite-reconnect-interval"
+
+	flagGaplessAudio = "gapless-audio"
 )
 
 // ── Environment variable names ────────────────────────────────────────────────
@@ -108,6 +110,8 @@ const (
 	envSatelliteHeartbeatInterval      = "SUBSD_SATELLITE_HEARTBEAT_INTERVAL"
 	envSatelliteStateInterval          = "SUBSD_SATELLITE_STATE_INTERVAL"
 	envSatelliteReconnectInterval      = "SUBSD_SATELLITE_RECONNECT_INTERVAL"
+
+	envGaplessAudio = "SUBSD_GAPLESS_AUDIO"
 
 	envRemoteURL   = "SUBSD_REMOTE_URL"
 	envRemoteToken = "SUBSD_REMOTE_TOKEN" //nolint:gosec
@@ -301,6 +305,12 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Value:   satellite.DefaultReconnectInterval,
 		Sources: cli.EnvVars(envSatelliteReconnectInterval),
 	},
+	&cli.StringFlag{
+		Name:    flagGaplessAudio,
+		Usage:   "Gapless audio mode: yes (always gapless), weak (only when audio format is compatible between tracks), no (disabled). Requires a daemon restart to take effect.",
+		Value:   string(player.GaplessAudioWeak),
+		Sources: cli.EnvVars(envGaplessAudio),
+	},
 })
 
 func main() {
@@ -402,7 +412,11 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		}
 		log.Info().Str("host", subsonicHost).Msg("connected to Subsonic server")
 
-		backend, err := player.NewMPVBackend()
+		gapless, err := player.ParseGaplessAudio(cmd.String(flagGaplessAudio))
+		if err != nil {
+			return err
+		}
+		backend, err := player.NewMPVBackend(gapless)
 		if err != nil {
 			return fmt.Errorf("failed to start player: %w", err)
 		}
@@ -549,7 +563,11 @@ func runSatelliteMode(ctx context.Context, cmd *cli.Command) error {
 	}
 	name := satelliteName(cmd)
 
-	backend, err := player.NewMPVBackend()
+	gapless, err := player.ParseGaplessAudio(cmd.String(flagGaplessAudio))
+	if err != nil {
+		return err
+	}
+	backend, err := player.NewMPVBackend(gapless)
 	if err != nil {
 		return fmt.Errorf("failed to start player: %w", err)
 	}

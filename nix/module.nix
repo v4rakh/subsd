@@ -291,6 +291,18 @@ in
       description = "How long a satellite waits before retrying a lost connection (SUBSD_SATELLITE_RECONNECT_INTERVAL). Defaults to 5s when unset.";
     };
 
+    gaplessAudio = lib.mkOption {
+      type = lib.types.nullOr (
+        lib.types.enum [
+          "yes"
+          "no"
+          "weak"
+        ]
+      );
+      default = null;
+      description = "Gapless audio mode (SUBSD_GAPLESS_AUDIO): yes (always gapless), weak (only when audio format is compatible between tracks), no (disabled). Requires a daemon restart to take effect. Defaults to weak when unset.";
+    };
+
     corsOrigins = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -440,7 +452,8 @@ in
         }
         // lib.optionalAttrs (cfg.satelliteReconnectInterval != null) {
           SUBSD_SATELLITE_RECONNECT_INTERVAL = cfg.satelliteReconnectInterval;
-        };
+        }
+        // lib.optionalAttrs (cfg.gaplessAudio != null) { SUBSD_GAPLESS_AUDIO = cfg.gaplessAudio; };
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/subsd";

@@ -2,6 +2,7 @@
 package player
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 
@@ -20,6 +21,29 @@ const (
 	ReplayGainTrack = "track"
 	ReplayGainAlbum = "album"
 )
+
+// GaplessAudio controls gapless audio.
+// "yes" always plays gapless; "weak" only when the audio format
+// is compatible between tracks; "no" disables gapless entirely.
+// Changing this requires a daemon restart.
+// Any playback implementation needs to adhere to the above when implementing.
+type GaplessAudio string
+
+const (
+	GaplessAudioYes  GaplessAudio = "yes"
+	GaplessAudioNo   GaplessAudio = "no"
+	GaplessAudioWeak GaplessAudio = "weak"
+)
+
+// ParseGaplessAudio validates and returns the GaplessAudio for the given string.
+func ParseGaplessAudio(s string) (GaplessAudio, error) {
+	switch GaplessAudio(s) {
+	case GaplessAudioYes, GaplessAudioNo, GaplessAudioWeak:
+		return GaplessAudio(s), nil
+	default:
+		return "", fmt.Errorf("invalid gapless-audio value %q: must be yes, no, or weak", s)
+	}
+}
 
 // State is the full snapshot broadcast to browsers over WebSocket.
 type State struct {

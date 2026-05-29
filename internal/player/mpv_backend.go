@@ -41,6 +41,7 @@ type MPVBackend struct {
 	cmdMu      sync.Mutex
 	volume     int
 	replayGain string
+	gapless    GaplessAudio
 
 	socketPath     string
 	pendingSeek    float64
@@ -55,10 +56,10 @@ type MPVBackend struct {
 // NewMPVBackend launches mpv, opens the IPC socket, and returns a ready
 // MPVBackend. Goroutines are started after setEventListener is called (via the
 // wireable interface in player.New). No goroutines run until then.
-func NewMPVBackend() (*MPVBackend, error) {
+func NewMPVBackend(gapless GaplessAudio) (*MPVBackend, error) {
 	socketPath := fmt.Sprintf("%s/subsd-mpv-%s.sock", os.TempDir(), uuid.New())
 
-	cmd, err := launchMPV(context.Background(), socketPath)
+	cmd, err := launchMPV(context.Background(), socketPath, gapless)
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +82,7 @@ func NewMPVBackend() (*MPVBackend, error) {
 		socketPath: socketPath,
 		volume:     100,
 		replayGain: ReplayGainOff,
+		gapless:    gapless,
 		closeCh:    make(chan struct{}),
 	}, nil
 }
@@ -362,16 +364,16 @@ func (b *MPVBackend) watchMPV() {
 		vol := b.volume
 		b.mu.Unlock()
 
-		if err := b.restartMPV(vol); err != nil {
+		if err := b.restartMPV(vol, b.gapless); err != nil {
 			log.Error().Err(err).Msg("player: mpv restart failed")
 			return
 		}
-		log.Info().Msg("player: mpv restarted")
+		log.Info().Str("gapless", string(b.gapless)).Msg("player: mpv restarted")
 	}
 }
 
 // restartMPV launches a new mpv process and swaps in the new connection.
-func (b *MPVBackend) restartMPV(vol int) error {
+func (b *MPVBackend) restartMPV(vol int, gapless GaplessAudio) error {
 	b.cmdMu.Lock()
 	old := b.cmd
 	b.cmdMu.Unlock()
@@ -381,7 +383,7 @@ func (b *MPVBackend) restartMPV(vol int) error {
 		}
 	}
 
-	cmd, err := launchMPV(context.Background(), b.socketPath)
+	cmd, err := launchMPV(context.Background(), b.socketPath, gapless)
 	if err != nil {
 		return err
 	}
@@ -425,7 +427,7 @@ func (mpvLogWriter) Write(p []byte) (int, error) {
 }
 
 // launchMPV starts mpv as a subprocess and waits for the socket file to appear.
-func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
+func launchMPV(ctx context.Context, socketPath string, gapless GaplessAudio) (*exec.Cmd, error) {
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
 		log.Warn().Err(err).Msg("player: remove stale socket")
 	}
@@ -435,7 +437,7 @@ func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
 		"--idle=yes",
 		"--input-ipc-server="+socketPath,
 		"--msg-level=all=warn",
-		"--gapless-audio=yes",
+		"--gapless-audio="+string(gapless),
 	)
 	// Ensure mpv dies whenever the parent process exits.
 	setSysProcAttr(cmd)
@@ -443,7 +445,7 @@ func launchMPV(ctx context.Context, socketPath string) (*exec.Cmd, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	log.Info().Str("socket", socketPath).Msg("player: mpv launched")
+	log.Info().Str("socket", socketPath).Str("gapless", string(gapless)).Msg("player: mpv launched")
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
