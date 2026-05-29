@@ -12,13 +12,16 @@ import (
 
 // State is the subset of player.State written to disk.
 type State struct {
-	Queue      []player.Track `json:"queue"`
-	CurrentIdx int            `json:"currentIdx"`
-	Volume     int            `json:"volume"`
-	Shuffle    bool           `json:"shuffle"`
-	Repeat     bool           `json:"repeat"`
-	Position   float64        `json:"position,omitempty"`
-	SavedAt    time.Time      `json:"savedAt"`
+	Queue              []player.Track `json:"queue"`
+	CurrentIdx         int            `json:"currentIdx"`
+	Volume             int            `json:"volume"`
+	Shuffle            bool           `json:"shuffle"`
+	Repeat             bool           `json:"repeat"`
+	Position           float64        `json:"position,omitempty"`
+	ReplayGain         string         `json:"replayGain,omitempty"`
+	AudioDevice        string         `json:"audioDevice,omitempty"`
+	PreferredSatellite string         `json:"preferredSatellite,omitempty"`
+	SavedAt            time.Time      `json:"savedAt"`
 }
 
 // DefaultPath returns the XDG-compliant default location for the state file.

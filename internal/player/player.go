@@ -317,13 +317,18 @@ func (p *Player) SetLastScrobble(status string) {
 // Volume is applied to mpv immediately; all other fields are held in memory
 // until the user presses Play. If position > 0 it will be applied via a seek
 // after the first file-loaded event (i.e. when Play is first pressed).
-func (p *Player) RestoreState(tracks []Track, currentIdx, volume int, shuffle, repeat bool, position float64) {
+// replayGain may be empty, in which case it defaults to ReplayGainOff.
+func (p *Player) RestoreState(tracks []Track, currentIdx, volume int, shuffle, repeat bool, position float64, replayGain string) {
 	p.SetVolume(volume)
+	if replayGain == "" {
+		replayGain = ReplayGainOff
+	}
 	p.mu.Lock()
 	p.state.Queue = tracks
 	p.state.CurrentIdx = currentIdx
 	p.state.Shuffle = shuffle
 	p.state.Repeat = repeat
+	p.state.ReplayGain = replayGain
 	p.state.Position = position // show saved position in UI immediately
 	p.pendingSeek = position
 	p.mu.Unlock()
@@ -955,12 +960,14 @@ func (p *Player) GetAudioDevice() string {
 }
 
 // SetAudioDevice switches mpv's audio output to the named device without
-// stopping playback.
+// stopping playback. Notifies listeners so the updated device is broadcast
+// via WebSocket and the autosave captures the new value.
 func (p *Player) SetAudioDevice(name string) error {
 	if err := p.ipc().Set("audio-device", name); err != nil {
 		return err
 	}
 	log.Info().Str("device", name).Msg("player: audio device changed")
+	p.notify()
 	return nil
 }
 

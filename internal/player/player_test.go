@@ -549,7 +549,7 @@ func TestPrev_AtFirstTrack(t *testing.T) {
 func TestRestoreState(t *testing.T) {
 	p, _ := newTestPlayer()
 	ts := tracks(3)
-	p.RestoreState(ts, 1, 60, true, false, 30.5)
+	p.RestoreState(ts, 1, 60, true, false, 30.5, ReplayGainTrack)
 
 	st := p.GetState()
 	if len(st.Queue) != 3 {
@@ -569,6 +569,17 @@ func TestRestoreState(t *testing.T) {
 	}
 	if st.Position != 30.5 {
 		t.Errorf("Position: got %f, want 30.5", st.Position)
+	}
+	if st.ReplayGain != ReplayGainTrack {
+		t.Errorf("ReplayGain: got %q, want %q", st.ReplayGain, ReplayGainTrack)
+	}
+}
+
+func TestRestoreState_EmptyReplayGainDefaultsToOff(t *testing.T) {
+	p, _ := newTestPlayer()
+	p.RestoreState(nil, -1, 100, false, false, 0, "")
+	if st := p.GetState(); st.ReplayGain != ReplayGainOff {
+		t.Errorf("ReplayGain: got %q, want %q", st.ReplayGain, ReplayGainOff)
 	}
 }
 

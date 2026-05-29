@@ -14,6 +14,10 @@ type Registry struct {
 	satellites map[string]Satellite // keyed by satellite name
 	activeName string
 
+	// preferredSatellite is the name of the satellite to auto-activate when it
+	// connects. Set from persisted state on startup; cleared by SetActive("").
+	preferredSatellite string
+
 	// onStateChange is called (in a goroutine) whenever the active satellite
 	// emits a new PlaybackState.
 	onStateChange func(PlaybackState)
@@ -27,6 +31,12 @@ type Registry struct {
 
 	// onActiveDisconnect is called when the currently active satellite unregisters.
 	onActiveDisconnect func(name string)
+
+	// onAutoActivate is called when Register auto-activates the preferred
+	// satellite (i.e. when it reconnects after a daemon restart). The caller
+	// (SatelliteController) uses this to push volume and reset player state,
+	// mirroring the finishing steps of SetActive.
+	onAutoActivate func(name string)
 }
 
 // NewRegistry creates an empty registry with no satellites registered.
@@ -64,9 +74,27 @@ func (r *Registry) OnActiveDisconnect(fn func(name string)) {
 	r.mu.Unlock()
 }
 
+// OnAutoActivate registers a callback called when Register auto-activates the
+// preferred satellite. The SatelliteController uses this to push volume and
+// reset player state — the same finishing steps as a manual SetActive call.
+func (r *Registry) OnAutoActivate(fn func(name string)) {
+	r.mu.Lock()
+	r.onAutoActivate = fn
+	r.mu.Unlock()
+}
+
+// SetPreferredSatellite sets the name of the satellite that should be
+// auto-activated when it connects via Register. Pass "" to clear the preference.
+func (r *Registry) SetPreferredSatellite(name string) {
+	r.mu.Lock()
+	r.preferredSatellite = name
+	r.mu.Unlock()
+}
+
 // Register adds or replaces a satellite by name. If replacing, the old
 // satellite is closed. If no active satellite exists, the first registered
-// one becomes active.
+// one becomes active. If a preferred satellite name is set and the registering
+// satellite matches it, it is auto-activated and onAutoActivate fires.
 func (r *Registry) Register(s Satellite) {
 	r.mu.Lock()
 	if old, ok := r.satellites[s.Name()]; ok {
@@ -75,10 +103,17 @@ func (r *Registry) Register(s Satellite) {
 	}
 
 	r.satellites[s.Name()] = s
-	firstActive := r.activeName == ""
-	if firstActive {
+	becameActive := false
+	autoActivated := false
+	if r.activeName == "" {
 		r.activeName = s.Name()
+		becameActive = true
+	} else if r.preferredSatellite != "" && s.Name() == r.preferredSatellite && r.activeName != s.Name() {
+		r.activeName = s.Name()
+		becameActive = true
+		autoActivated = true
 	}
+	autoActivateFn := r.onAutoActivate
 	r.mu.Unlock()
 
 	// Wire callbacks after releasing the lock to avoid re-entrancy.
@@ -101,8 +136,13 @@ func (r *Registry) Register(s Satellite) {
 		}
 	})
 
-	log.Info().Str("name", s.Name()).Bool("active", firstActive).Msg("satellite: registered")
+	log.Info().Str("name", s.Name()).Bool("active", becameActive).Msg("satellite: registered")
 	r.notifyList()
+
+	// Fire after notifyList so SyncBackend has already swapped the backend.
+	if autoActivated && autoActivateFn != nil {
+		autoActivateFn(s.Name())
+	}
 }
 
 // Unregister removes a satellite by name. If it was active, activeName becomes

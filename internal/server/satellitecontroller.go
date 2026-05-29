@@ -58,6 +58,20 @@ func NewSatelliteController(p *player.Player, reg *satellite.Registry) *Satellit
 		}
 	})
 
+	// When a preferred satellite reconnects and is auto-activated, push the
+	// current volume to it and reset player state to stopped — same finishing
+	// steps as a manual SetActive call. SyncBackend is already done by the
+	// time this fires (notifyList runs before onAutoActivate in Register).
+	reg.OnAutoActivate(func(name string) {
+		active := reg.Active()
+		if active == nil || active.IsLocal() {
+			return
+		}
+		currentVol := p.GetState().Volume
+		_ = reg.Dispatch(satellite.Command{Type: satellite.CmdSetVolume, Volume: currentVol})
+		p.InjectRemoteState(false, 0, 0, currentVol)
+	})
+
 	return sc
 }
 

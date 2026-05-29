@@ -417,38 +417,70 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		}
 		defer pl.Close()
 
+		sc = subClient
+		pc = pl
+
+		// Build satellite registry and register the in-process satellite.
+		// Must happen before persistence load so we can set the preferred
+		// satellite name before remote satellites start connecting.
+		reg = satellite.NewRegistry()
+		satName := satelliteName(cmd)
+		inProc := satellite.NewInProcess(satName, pl)
+		reg.Register(inProc)
+
 		if ps, err := persistence.Load(stateFile); err == nil {
-			pl.RestoreState(ps.Queue, ps.CurrentIdx, ps.Volume, ps.Shuffle, ps.Repeat, ps.Position)
+			pl.RestoreState(ps.Queue, ps.CurrentIdx, ps.Volume, ps.Shuffle, ps.Repeat, ps.Position, ps.ReplayGain)
+			if ps.AudioDevice != "" {
+				if err := pl.SetAudioDevice(ps.AudioDevice); err != nil {
+					log.Warn().Err(err).Str("device", ps.AudioDevice).Msg("failed to restore audio device")
+				}
+			}
+			if ps.PreferredSatellite != "" {
+				reg.SetPreferredSatellite(ps.PreferredSatellite)
+			}
 			log.Info().Int("tracks", len(ps.Queue)).Str("file", stateFile).Msg("state restored")
 		}
 
-		// Autosave: debounce state saves on every player change so queue
-		// mutations survive crashes (not just graceful shutdown).
+		// Autosave: persist state on every player change. A 5s debounce
+		// coalesces rapid events (e.g. seeking). However, position ticks
+		// arrive every second and keep resetting the debounce, so the timer
+		// would never fire during active playback. A max-age of 30s ensures
+		// we save at least that often regardless: once 30s have elapsed since
+		// the last save the next incoming change fires immediately.
+		// State is always read fresh at save time so in-flight volume/repeat/
+		// shuffle/device changes are always captured correctly.
+		const (
+			autosaveDebounce = 5 * time.Second
+			autosaveMaxAge   = 30 * time.Second
+		)
 		var (
 			autosaveMu    sync.Mutex
 			autosaveTimer *time.Timer
+			lastSavedAt   time.Time
 		)
-		pl.OnChange(func(state player.State) {
+		doAutosave := func() {
+			ps := persistenceStateFrom(pl.GetState())
+			ps.AudioDevice = pl.GetAudioDevice()
+			ps.PreferredSatellite = reg.ActiveName()
+			autosaveMu.Lock()
+			lastSavedAt = time.Now()
+			autosaveMu.Unlock()
+			if err := persistence.Save(stateFile, ps); err != nil {
+				log.Error().Err(err).Str("file", stateFile).Msg("autosave failed")
+			}
+		}
+		pl.OnChange(func(_ player.State) {
 			autosaveMu.Lock()
 			defer autosaveMu.Unlock()
 			if autosaveTimer != nil {
 				autosaveTimer.Stop()
 			}
-			autosaveTimer = time.AfterFunc(5*time.Second, func() {
-				if err := persistence.Save(stateFile, persistenceStateFrom(state)); err != nil {
-					log.Error().Err(err).Str("file", stateFile).Msg("autosave failed")
-				}
-			})
+			delay := autosaveDebounce
+			if time.Since(lastSavedAt) >= autosaveMaxAge {
+				delay = 0
+			}
+			autosaveTimer = time.AfterFunc(delay, doAutosave)
 		})
-
-		sc = subClient
-		pc = pl
-
-		// Build satellite registry and register the in-process satellite.
-		reg = satellite.NewRegistry()
-		satName := satelliteName(cmd)
-		inProc := satellite.NewInProcess(satName, pl)
-		reg.Register(inProc)
 
 		// Start gRPC satellite server.
 		grpcToken, err := resolveSecret(cmd.String(flagGRPCToken), cmd.String(flagGRPCTokenFile), "grpc-token")
@@ -486,7 +518,12 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 	log.Info().Msg("shutting down")
 
 	if pl != nil {
-		if err := persistence.Save(stateFile, persistenceStateFrom(pl.GetState())); err != nil {
+		ps := persistenceStateFrom(pl.GetState())
+		ps.AudioDevice = pl.GetAudioDevice()
+		if reg != nil {
+			ps.PreferredSatellite = reg.ActiveName()
+		}
+		if err := persistence.Save(stateFile, ps); err != nil {
 			log.Error().Err(err).Str("file", stateFile).Msg("failed to save state")
 		} else {
 			log.Info().Str("file", stateFile).Msg("state saved")
@@ -594,6 +631,8 @@ func parseSameSite(s string) http.SameSite {
 }
 
 // persistenceStateFrom converts a player state snapshot to a persistence record.
+// AudioDevice and PreferredSatellite are not in player.State; callers set them
+// separately after calling this function.
 func persistenceStateFrom(s player.State) persistence.State {
 	return persistence.State{
 		Queue:      s.Queue,
@@ -602,6 +641,7 @@ func persistenceStateFrom(s player.State) persistence.State {
 		Shuffle:    s.Shuffle,
 		Repeat:     s.Repeat,
 		Position:   s.Position,
+		ReplayGain: s.ReplayGain,
 		SavedAt:    time.Now(),
 	}
 }
