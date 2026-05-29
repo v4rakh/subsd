@@ -402,10 +402,11 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		}
 		log.Info().Str("host", subsonicHost).Msg("connected to Subsonic server")
 
-		pl, err = player.New()
+		backend, err := player.NewMPVBackend()
 		if err != nil {
 			return fmt.Errorf("failed to start player: %w", err)
 		}
+		pl = player.New(backend)
 		defer pl.Close()
 
 		sc = subClient
@@ -548,10 +549,11 @@ func runSatelliteMode(ctx context.Context, cmd *cli.Command) error {
 	}
 	name := satelliteName(cmd)
 
-	pl, err := player.New()
+	backend, err := player.NewMPVBackend()
 	if err != nil {
 		return fmt.Errorf("failed to start player: %w", err)
 	}
+	pl := player.New(backend)
 	defer pl.Close()
 
 	grpcToken, err := resolveSecret(cmd.String(flagGRPCToken), cmd.String(flagGRPCTokenFile), "grpc-token")

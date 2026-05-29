@@ -1,83 +1,138 @@
 package player
 
-// White-box tests: same package so we can call newWithIPC and inspect state.
+// White-box tests: same package so we can call New and inspect state directly.
 
 import (
 	"sync"
 	"testing"
 	"time"
-
-	"varakh.de/subsd/internal/mpv"
 )
 
-// ── fakeIPC ──────────────────────────────────────────────────────────────────
+// ── fakeBackend ───────────────────────────────────────────────────────────────
 
-type fakeIPC struct {
-	mu         sync.Mutex
-	commands   [][]any        // recorded Command calls for assertions
-	getResults map[string]any // values returned by Get
-	closed     chan struct{}
+type playURLCall struct {
+	track    Track
+	position float64
 }
 
-func newFakeIPC() *fakeIPC {
-	return &fakeIPC{
-		getResults: make(map[string]any),
-		closed:     make(chan struct{}),
-	}
+type resumeCall struct {
+	track  Track
+	seekTo float64
 }
 
-func (f *fakeIPC) Command(args ...any) (any, error) {
+type fakeBackend struct {
+	mu          sync.Mutex
+	playURLs    []playURLCall
+	pauses      int
+	resumes     []resumeCall
+	seeks       []float64
+	stops       int
+	audioDevice string
+}
+
+func (f *fakeBackend) IsLocal() bool { return true }
+
+func (f *fakeBackend) PlayURL(t Track, position float64) {
 	f.mu.Lock()
-	f.commands = append(f.commands, append([]any(nil), args...))
+	f.playURLs = append(f.playURLs, playURLCall{t, position})
 	f.mu.Unlock()
-	return nil, nil
 }
 
-func (f *fakeIPC) Set(_ string, _ any) error { return nil }
+func (f *fakeBackend) Pause() {
+	f.mu.Lock()
+	f.pauses++
+	f.mu.Unlock()
+}
 
-func (f *fakeIPC) Get(property string) (any, error) {
+func (f *fakeBackend) Resume(t Track, seekTo float64) {
+	f.mu.Lock()
+	f.resumes = append(f.resumes, resumeCall{t, seekTo})
+	f.mu.Unlock()
+}
+
+func (f *fakeBackend) Seek(seconds float64) {
+	f.mu.Lock()
+	f.seeks = append(f.seeks, seconds)
+	f.mu.Unlock()
+}
+
+func (f *fakeBackend) SetVolume(_ int)      {}
+func (f *fakeBackend) SetReplayGain(_ string) {}
+func (f *fakeBackend) Stop() {
+	f.mu.Lock()
+	f.stops++
+	f.mu.Unlock()
+}
+func (f *fakeBackend) Close() {}
+func (f *fakeBackend) GetAudioDevices() ([]AudioDevice, error) { return nil, nil }
+func (f *fakeBackend) GetAudioDevice() string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.getResults[property], nil
+	return f.audioDevice
+}
+func (f *fakeBackend) SetAudioDevice(name string) error {
+	f.mu.Lock()
+	f.audioDevice = name
+	f.mu.Unlock()
+	return nil
 }
 
-func (f *fakeIPC) GetFloat(property string) float64 {
-	v, _ := f.Get(property)
-	if n, ok := v.(float64); ok {
-		return n
+func (f *fakeBackend) playURLCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.playURLs)
+}
+
+func (f *fakeBackend) stopCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.stops
+}
+
+func (f *fakeBackend) seekCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.seeks)
+}
+
+func (f *fakeBackend) resumeCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.resumes)
+}
+
+func (f *fakeBackend) lastSeek() float64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.seeks) == 0 {
+		return -1
 	}
-	return 0
+	return f.seeks[len(f.seeks)-1]
 }
 
-func (f *fakeIPC) Subscribe() (<-chan mpv.Event, func()) {
-	ch := make(chan mpv.Event, 16)
-	return ch, func() {}
-}
-
-func (f *fakeIPC) Done() <-chan struct{} { return f.closed }
-func (f *fakeIPC) Close()                {}
-
-func (f *fakeIPC) lastCommand() []any {
+func (f *fakeBackend) lastResume() resumeCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if len(f.commands) == 0 {
-		return nil
+	if len(f.resumes) == 0 {
+		return resumeCall{}
 	}
-	return f.commands[len(f.commands)-1]
+	return f.resumes[len(f.resumes)-1]
 }
 
-func (f *fakeIPC) commandCount() int {
+// totalActionCalls returns the total number of playback action calls
+// (PlayURL, Pause, Resume, Seek, Stop). Does not count SetVolume / SetReplayGain.
+func (f *fakeBackend) totalActionCalls() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return len(f.commands)
+	return len(f.playURLs) + f.pauses + len(f.resumes) + len(f.seeks) + f.stops
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-func newTestPlayer() (*Player, *fakeIPC) {
-	ipc := newFakeIPC()
-	p := newWithIPC(ipc, "", nil)
-	return p, ipc
+func newTestPlayer() (*Player, *fakeBackend) {
+	b := &fakeBackend{}
+	p := New(b)
+	return p, b
 }
 
 func tracks(n int) []Track {
@@ -95,7 +150,7 @@ func tracks(n int) []Track {
 // ── Queue ─────────────────────────────────────────────────────────────────────
 
 func TestAddToQueue_StartsPlaybackWhenEmpty(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	tr := tracks(1)[0]
 	p.AddToQueue(tr)
 
@@ -109,18 +164,16 @@ func TestAddToQueue_StartsPlaybackWhenEmpty(t *testing.T) {
 	if !st.Playing {
 		t.Error("expected Playing=true after first enqueue")
 	}
-	// Verify loadfile was sent to IPC.
-	cmd := ipc.lastCommand()
-	if len(cmd) < 1 || cmd[0] != "loadfile" {
-		t.Errorf("expected loadfile command, got %v", cmd)
+	if backend.playURLCount() != 1 {
+		t.Errorf("expected PlayURL called once, got %d", backend.playURLCount())
 	}
 }
 
 func TestAddToQueue_AppendsWhenAlreadyPlaying(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	ts := tracks(3)
 	p.AddToQueue(ts[0]) // starts playback
-	prevCmds := ipc.commandCount()
+	prevCalls := backend.totalActionCalls()
 	p.AddToQueue(ts[1])
 	p.AddToQueue(ts[2])
 
@@ -131,14 +184,14 @@ func TestAddToQueue_AppendsWhenAlreadyPlaying(t *testing.T) {
 	if st.CurrentIdx != 0 {
 		t.Errorf("CurrentIdx should stay 0, got %d", st.CurrentIdx)
 	}
-	// No additional loadfile commands for subsequent enqueues.
-	if ipc.commandCount() != prevCmds {
-		t.Errorf("unexpected IPC command after non-first enqueue")
+	// No additional playback calls for subsequent enqueues.
+	if backend.totalActionCalls() != prevCalls {
+		t.Errorf("unexpected backend calls after non-first enqueue")
 	}
 }
 
 func TestAddAllToQueue_BatchEnqueue(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	ts := tracks(5)
 	p.AddAllToQueue(ts)
 
@@ -149,9 +202,9 @@ func TestAddAllToQueue_BatchEnqueue(t *testing.T) {
 	if st.CurrentIdx != 0 {
 		t.Errorf("CurrentIdx: got %d, want 0", st.CurrentIdx)
 	}
-	// Exactly one loadfile command for the whole batch.
-	if ipc.commandCount() != 1 {
-		t.Errorf("expected 1 IPC command, got %d", ipc.commandCount())
+	// Exactly one PlayURL for the whole batch.
+	if backend.playURLCount() != 1 {
+		t.Errorf("expected 1 PlayURL call, got %d", backend.playURLCount())
 	}
 }
 
@@ -168,10 +221,10 @@ func TestAddAllToQueue_AppendsWhenPlaying(t *testing.T) {
 }
 
 func TestAddAllToQueue_Empty_NoOp(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(nil)
-	if ipc.commandCount() != 0 {
-		t.Error("empty AddAllToQueue should not send IPC commands")
+	if backend.totalActionCalls() != 0 {
+		t.Error("empty AddAllToQueue should not call backend")
 	}
 }
 
@@ -179,16 +232,14 @@ func TestRemoveFromQueue_BeforeCurrent(t *testing.T) {
 	p, _ := newTestPlayer()
 	ts := tracks(4)
 	p.AddAllToQueue(ts)
-	// Jump to track 2 (index 2) first.
 	p.state.CurrentIdx = 2
 
-	p.RemoveFromQueue(0) // remove track before current
+	p.RemoveFromQueue(0)
 
 	st := p.GetState()
 	if len(st.Queue) != 3 {
 		t.Fatalf("queue length: got %d, want 3", len(st.Queue))
 	}
-	// CurrentIdx should decrement.
 	if st.CurrentIdx != 1 {
 		t.Errorf("CurrentIdx: got %d, want 1", st.CurrentIdx)
 	}
@@ -199,7 +250,7 @@ func TestRemoveFromQueue_AfterCurrent(t *testing.T) {
 	p.AddAllToQueue(tracks(4))
 	p.state.CurrentIdx = 1
 
-	p.RemoveFromQueue(3) // remove last track
+	p.RemoveFromQueue(3)
 
 	st := p.GetState()
 	if len(st.Queue) != 3 {
@@ -211,12 +262,12 @@ func TestRemoveFromQueue_AfterCurrent(t *testing.T) {
 }
 
 func TestRemoveFromQueue_Current(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
 	p.state.CurrentIdx = 1
 
-	prevCmds := ipc.commandCount()
-	p.RemoveFromQueue(1) // remove currently playing track
+	prevStops := backend.stopCount()
+	p.RemoveFromQueue(1)
 
 	st := p.GetState()
 	if len(st.Queue) != 2 {
@@ -225,34 +276,32 @@ func TestRemoveFromQueue_Current(t *testing.T) {
 	if st.Playing {
 		t.Error("expected Playing=false after removing current track")
 	}
-	// Stop command should be sent.
-	if ipc.commandCount() <= prevCmds {
-		t.Error("expected stop command after removing current track")
+	if backend.stopCount() <= prevStops {
+		t.Error("expected Stop() after removing current track")
 	}
 }
 
 func TestRemoveFromQueue_CurrentLast(t *testing.T) {
 	p, _ := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
-	p.state.CurrentIdx = 2 // last track
+	p.state.CurrentIdx = 2
 
 	p.RemoveFromQueue(2)
 
 	st := p.GetState()
-	// CurrentIdx should clamp to new last index.
 	if st.CurrentIdx != 1 {
 		t.Errorf("CurrentIdx: got %d, want 1", st.CurrentIdx)
 	}
 }
 
 func TestRemoveFromQueue_OutOfRange(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(2))
-	before := ipc.commandCount()
+	before := backend.totalActionCalls()
 	p.RemoveFromQueue(-1)
 	p.RemoveFromQueue(99)
-	if ipc.commandCount() != before {
-		t.Error("out-of-range remove should not issue IPC commands")
+	if backend.totalActionCalls() != before {
+		t.Error("out-of-range remove should not call backend")
 	}
 	if len(p.GetState().Queue) != 2 {
 		t.Error("queue should be unchanged for out-of-range remove")
@@ -265,14 +314,12 @@ func TestMoveInQueue_Forward(t *testing.T) {
 	p.AddAllToQueue(ts)
 	p.state.CurrentIdx = 0
 
-	// Move track 0 to position 2: [A,B,C,D] → [B,C,A,D]
 	p.MoveInQueue(0, 2)
 
 	st := p.GetState()
 	if st.Queue[0].ID != "B" || st.Queue[1].ID != "C" || st.Queue[2].ID != "A" {
 		t.Errorf("unexpected queue order: %v", st.Queue)
 	}
-	// Track A moved to index 2, so CurrentIdx should follow.
 	if st.CurrentIdx != 2 {
 		t.Errorf("CurrentIdx: got %d, want 2", st.CurrentIdx)
 	}
@@ -284,7 +331,6 @@ func TestMoveInQueue_Backward(t *testing.T) {
 	p.AddAllToQueue(ts)
 	p.state.CurrentIdx = 3
 
-	// Move track 3 to position 1: [A,B,C,D] → [A,D,B,C]
 	p.MoveInQueue(3, 1)
 
 	st := p.GetState()
@@ -300,9 +346,8 @@ func TestMoveInQueue_NonCurrentShifted(t *testing.T) {
 	p, _ := newTestPlayer()
 	ts := tracks(4)
 	p.AddAllToQueue(ts)
-	p.state.CurrentIdx = 1 // B is current
+	p.state.CurrentIdx = 1
 
-	// Move A (0) to 2: [A,B,C,D] → [B,C,A,D]; B was at 1, now at 0.
 	p.MoveInQueue(0, 2)
 
 	st := p.GetState()
@@ -312,12 +357,12 @@ func TestMoveInQueue_NonCurrentShifted(t *testing.T) {
 }
 
 func TestMoveInQueue_SamePosition_NoOp(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
-	before := ipc.commandCount()
+	before := backend.totalActionCalls()
 	p.MoveInQueue(1, 1)
-	if ipc.commandCount() != before {
-		t.Error("same-position move should not issue IPC commands")
+	if backend.totalActionCalls() != before {
+		t.Error("same-position move should not call backend")
 	}
 }
 
@@ -335,9 +380,9 @@ func TestMoveInQueue_OutOfRange(t *testing.T) {
 }
 
 func TestClearQueue(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
-	prevCmds := ipc.commandCount()
+	prevStops := backend.stopCount()
 	p.ClearQueue()
 
 	st := p.GetState()
@@ -350,8 +395,8 @@ func TestClearQueue(t *testing.T) {
 	if st.Playing {
 		t.Error("expected Playing=false after ClearQueue")
 	}
-	if ipc.commandCount() <= prevCmds {
-		t.Error("expected stop command after ClearQueue")
+	if backend.stopCount() <= prevStops {
+		t.Error("expected Stop() after ClearQueue")
 	}
 }
 
@@ -421,26 +466,26 @@ func TestSetLastScrobble(t *testing.T) {
 }
 
 func TestJumpTo(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(4))
+	prevPlayURLs := backend.playURLCount()
 	p.JumpTo(2)
 	if p.GetState().CurrentIdx != 2 {
 		t.Errorf("CurrentIdx: got %d, want 2", p.GetState().CurrentIdx)
 	}
-	cmd := ipc.lastCommand()
-	if len(cmd) < 1 || cmd[0] != "loadfile" {
-		t.Errorf("expected loadfile, got %v", cmd)
+	if backend.playURLCount() <= prevPlayURLs {
+		t.Error("expected PlayURL call after JumpTo")
 	}
 }
 
 func TestJumpTo_OutOfRange(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(2))
-	before := ipc.commandCount()
+	before := backend.totalActionCalls()
 	p.JumpTo(-1)
 	p.JumpTo(99)
-	if ipc.commandCount() != before {
-		t.Error("out-of-range JumpTo should not issue IPC commands")
+	if backend.totalActionCalls() != before {
+		t.Error("out-of-range JumpTo should not call backend")
 	}
 }
 
@@ -449,7 +494,6 @@ func TestJumpTo_OutOfRange(t *testing.T) {
 func TestNext_Sequential(t *testing.T) {
 	p, _ := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
-	// Current is 0 after AddAllToQueue.
 	p.Next()
 	if p.GetState().CurrentIdx != 1 {
 		t.Errorf("CurrentIdx: got %d, want 1", p.GetState().CurrentIdx)
@@ -468,79 +512,78 @@ func TestNext_RepeatWraps(t *testing.T) {
 }
 
 func TestNext_EndOfQueue_NoRepeat(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
 	p.state.CurrentIdx = 2
-	prevCmds := ipc.commandCount()
+	prevStops := backend.stopCount()
 	p.Next()
 	if p.GetState().Playing {
 		t.Error("expected Playing=false at end of queue without repeat")
 	}
-	if ipc.commandCount() <= prevCmds {
-		t.Error("expected stop command at end of queue")
+	if backend.stopCount() <= prevStops {
+		t.Error("expected Stop() at end of queue")
 	}
 }
 
 func TestNext_EmptyQueue(t *testing.T) {
-	p, ipc := newTestPlayer()
-	before := ipc.commandCount()
+	p, backend := newTestPlayer()
+	before := backend.totalActionCalls()
 	p.Next()
-	if ipc.commandCount() != before {
-		t.Error("Next on empty queue should not issue IPC commands")
+	if backend.totalActionCalls() != before {
+		t.Error("Next on empty queue should not call backend")
 	}
 }
 
 // ── Prev ─────────────────────────────────────────────────────────────────────
 
 func TestPrev_RestartTrack(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
 	p.state.CurrentIdx = 1
 	p.state.Position = 10.0 // > 3 seconds → restart
 
-	before := ipc.commandCount()
 	p.Prev()
 
 	if p.GetState().CurrentIdx != 1 {
 		t.Errorf("should stay at index 1 (restart), got %d", p.GetState().CurrentIdx)
 	}
-	cmd := ipc.lastCommand()
-	if len(cmd) < 1 || cmd[0] != "seek" {
-		t.Errorf("expected seek command for restart, got %v", cmd)
+	if backend.seekCount() < 1 {
+		t.Error("expected Seek() for restart")
 	}
-	_ = before
+	if backend.lastSeek() != 0 {
+		t.Errorf("seek position: got %f, want 0", backend.lastSeek())
+	}
 }
 
 func TestPrev_GoPreviousTrack(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
 	p.state.CurrentIdx = 2
 	p.state.Position = 1.0 // < 3 seconds → go back
 
+	prevPlayURLs := backend.playURLCount()
 	p.Prev()
 
 	if p.GetState().CurrentIdx != 1 {
 		t.Errorf("CurrentIdx: got %d, want 1", p.GetState().CurrentIdx)
 	}
-	cmd := ipc.lastCommand()
-	if len(cmd) < 1 || cmd[0] != "loadfile" {
-		t.Errorf("expected loadfile command, got %v", cmd)
+	if backend.playURLCount() <= prevPlayURLs {
+		t.Error("expected PlayURL after going to previous track")
 	}
 }
 
 func TestPrev_AtFirstTrack(t *testing.T) {
-	p, ipc := newTestPlayer()
+	p, backend := newTestPlayer()
 	p.AddAllToQueue(tracks(3))
 	p.state.CurrentIdx = 0
 	p.state.Position = 1.0
-	before := ipc.commandCount()
+	before := backend.totalActionCalls()
 	p.Prev()
-	// At index 0, Prev does nothing.
 	if p.GetState().CurrentIdx != 0 {
 		t.Errorf("CurrentIdx should stay 0, got %d", p.GetState().CurrentIdx)
 	}
-	if ipc.commandCount() != before {
-		t.Error("Prev at first track should not issue IPC commands")
+	if backend.totalActionCalls() != before {
+		t.Error("Prev at first track should not call backend")
 	}
 }
 
@@ -583,66 +626,85 @@ func TestRestoreState_EmptyReplayGainDefaultsToOff(t *testing.T) {
 	}
 }
 
-// ── handleEvent ───────────────────────────────────────────────────────────────
+// TestRestoreState_PendingSeekPassedToResume verifies that a position set via
+// RestoreState is forwarded to the backend when Play() is called.
+func TestRestoreState_PendingSeekPassedToResume(t *testing.T) {
+	p, backend := newTestPlayer()
+	ts := tracks(1)
+	p.RestoreState(ts, 0, 100, false, false, 45.0, ReplayGainOff)
+	p.Play()
 
-func TestHandleEvent_Pause(t *testing.T) {
-	p, ipc := newTestPlayer()
-	p.state.Playing = true
-	p.handleEvent(ipc, mpv.Event{Name: "pause"})
-	if p.GetState().Playing {
-		t.Error("expected Playing=false after pause event")
+	if backend.resumeCount() < 1 {
+		t.Fatal("expected Resume to be called")
 	}
-}
-
-func TestHandleEvent_Unpause(t *testing.T) {
-	p, ipc := newTestPlayer()
-	p.state.Playing = false
-	p.handleEvent(ipc, mpv.Event{Name: "unpause"})
-	if !p.GetState().Playing {
-		t.Error("expected Playing=true after unpause event")
+	last := backend.lastResume()
+	if last.seekTo != 45.0 {
+		t.Errorf("seekTo: got %f, want 45.0", last.seekTo)
 	}
-}
-
-func TestHandleEvent_FileLoaded_PendingSeek(t *testing.T) {
-	p, ipc := newTestPlayer()
-	p.mu.Lock()
-	p.pendingSeek = 45.0
-	p.mu.Unlock()
-
-	p.handleEvent(ipc, mpv.Event{Name: "file-loaded"})
-
-	cmd := ipc.lastCommand()
-	if len(cmd) < 2 || cmd[0] != "seek" {
-		t.Errorf("expected seek command for pending seek, got %v", cmd)
-	}
-	if cmd[1] != 45.0 {
-		t.Errorf("seek position: got %v, want 45.0", cmd[1])
-	}
-	// pendingSeek should be cleared.
-	p.mu.Lock()
+	// pendingSeek should be cleared in Player after Play().
+	p.mu.RLock()
 	ps := p.pendingSeek
-	p.mu.Unlock()
+	p.mu.RUnlock()
 	if ps != 0 {
 		t.Errorf("pendingSeek not cleared: %f", ps)
 	}
 }
 
-func TestHandleEvent_FileLoaded_NoPendingSeek(t *testing.T) {
-	p, ipc := newTestPlayer()
-	// pendingSeek is 0 by default.
-	before := ipc.commandCount()
-	p.handleEvent(ipc, mpv.Event{Name: "file-loaded"})
-	if ipc.commandCount() != before {
-		t.Error("expected no seek command when pendingSeek is 0")
+func TestPlay_NoPendingSeek_SeekToZero(t *testing.T) {
+	p, backend := newTestPlayer()
+	p.AddAllToQueue(tracks(1))
+	// Call Play again (AddAllToQueue already triggered PlayURL, not Resume).
+	// Pause first, then Play to exercise Resume path.
+	p.Pause()
+	p.Play()
+
+	last := backend.lastResume()
+	if last.seekTo != 0 {
+		t.Errorf("seekTo: got %f, want 0 when no pendingSeek", last.seekTo)
 	}
 }
 
-func TestHandleEvent_Seek_UpdatesPosition(t *testing.T) {
-	p, ipc := newTestPlayer()
-	ipc.getResults["time-pos"] = 12.5
-	p.handleEvent(ipc, mpv.Event{Name: "seek"})
+// ── eventListener callbacks ───────────────────────────────────────────────────
+
+func TestPaused_SetsPlayingFalse(t *testing.T) {
+	p, _ := newTestPlayer()
+	p.state.Playing = true
+	p.paused()
+	if p.GetState().Playing {
+		t.Error("expected Playing=false after paused()")
+	}
+}
+
+func TestUnpaused_SetsPlayingTrue(t *testing.T) {
+	p, _ := newTestPlayer()
+	p.state.Playing = false
+	p.unpaused()
+	if !p.GetState().Playing {
+		t.Error("expected Playing=true after unpaused()")
+	}
+}
+
+func TestSeeked_UpdatesPosition(t *testing.T) {
+	p, _ := newTestPlayer()
+	p.seeked(12.5)
 	if pos := p.GetState().Position; pos != 12.5 {
 		t.Errorf("Position: got %f, want 12.5", pos)
+	}
+}
+
+func TestPlaybackReset_ClearsState(t *testing.T) {
+	p, _ := newTestPlayer()
+	p.mu.Lock()
+	p.state.Playing = true
+	p.state.Position = 42.0
+	p.mu.Unlock()
+	p.playbackReset()
+	st := p.GetState()
+	if st.Playing {
+		t.Error("expected Playing=false after playbackReset()")
+	}
+	if st.Position != 0 {
+		t.Errorf("Position: got %f, want 0 after playbackReset()", st.Position)
 	}
 }
 
@@ -655,7 +717,6 @@ func TestOnChange_CalledOnStateChange(t *testing.T) {
 
 	p.ToggleShuffle()
 
-	// notify fires listeners in goroutines; allow a brief window.
 	select {
 	case s := <-called:
 		if !s.Shuffle {

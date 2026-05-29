@@ -91,7 +91,7 @@ func (sc *SatelliteController) SyncBackend() {
 		return
 	}
 	sc.player.CancelLocalPlayback()
-	sc.player.SetBackend(&satelliteBackend{registry: sc.registry, player: sc.player})
+	sc.player.SetBackend(&satelliteBackend{registry: sc.registry})
 }
 
 // satelliteBackend implements player.PlaybackBackend by forwarding all playback
@@ -100,10 +100,8 @@ func (sc *SatelliteController) SyncBackend() {
 //
 // hasFile tracks whether a CmdPlay has been dispatched so Resume() knows whether
 // to send CmdResume (file already loaded on remote) or CmdPlay (fresh start).
-// This mirrors how mpvBackend.Resume() uses Get("path") for the local case.
 type satelliteBackend struct {
 	registry *satellite.Registry
-	player   *player.Player
 	hasFile  bool
 }
 
@@ -132,11 +130,12 @@ func (b *satelliteBackend) Pause() {
 
 // Resume sends CmdResume if a file is already loaded on the remote satellite,
 // or CmdPlay if not (e.g. after a satellite switch or fresh selection).
-func (b *satelliteBackend) Resume() {
+// currentTrack and seekTo come directly from the Player, so no back-reference
+// to the Player is needed.
+func (b *satelliteBackend) Resume(currentTrack player.Track, seekTo float64) {
 	if !b.hasFile {
-		state := b.player.GetState()
-		if state.CurrentIdx >= 0 && state.CurrentIdx < len(state.Queue) {
-			b.PlayURL(state.Queue[state.CurrentIdx], 0)
+		if currentTrack.ID != "" {
+			b.PlayURL(currentTrack, seekTo)
 		}
 		return
 	}
@@ -160,6 +159,16 @@ func (b *satelliteBackend) Stop() {
 		log.Error().Err(err).Msg("satellite: dispatch stop failed")
 	}
 }
+
+// SetVolume, SetReplayGain, audio device, and Close are no-ops for the satellite
+// backend: volume and replaygain are dispatched by SatelliteController directly,
+// and audio device queries go through the registry's ActiveDevices.
+func (b *satelliteBackend) SetVolume(_ int)                                {}
+func (b *satelliteBackend) SetReplayGain(_ string)                         {}
+func (b *satelliteBackend) GetAudioDevices() ([]player.AudioDevice, error) { return nil, nil }
+func (b *satelliteBackend) GetAudioDevice() string                         { return "" }
+func (b *satelliteBackend) SetAudioDevice(_ string) error                  { return nil }
+func (b *satelliteBackend) Close()                                         {}
 
 // SetActive switches the active satellite:
 //  1. Switches the active satellite in the registry (triggers SyncBackend via OnSatelliteListChange).
