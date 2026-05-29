@@ -88,10 +88,12 @@ func (g *GRPCServer) Start(addr string) error {
 	return g.srv.Serve(lis)
 }
 
-// Stop gracefully shuts down the gRPC server.
+// Stop shuts down the gRPC server, forcefully closing any open satellite
+// streams. Satellites reconnect automatically, so there is no benefit in
+// waiting for long-lived bidirectional streams to finish on their own.
 func (g *GRPCServer) Stop() {
 	if g.srv != nil {
-		g.srv.GracefulStop()
+		g.srv.Stop()
 	}
 }
 
