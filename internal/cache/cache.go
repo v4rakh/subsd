@@ -15,6 +15,8 @@ type Cache[K comparable, V any] interface {
 	Get(key K) (V, bool)
 	// Set stores value under key, resetting any existing TTL.
 	Set(key K, value V)
+	// Delete removes a single entry from the cache.
+	Delete(key K)
 	// Clear removes all entries from the cache.
 	Clear()
 }
@@ -65,6 +67,13 @@ func (c *TTL[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items[key] = entry[V]{value: value, expiry: time.Now().Add(c.ttl)}
+}
+
+// Delete removes the entry for key from the cache.
+func (c *TTL[K, V]) Delete(key K) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.items, key)
 }
 
 // Clear removes all entries from the cache.

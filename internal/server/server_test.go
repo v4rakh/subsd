@@ -235,6 +235,30 @@ func (f *fakeSubsonic) Scrobble(_ context.Context, id string) error {
 
 func (f *fakeSubsonic) SetRating(_ context.Context, _ string, _ int) error { return f.err }
 
+func (f *fakeSubsonic) CreatePlaylist(_ context.Context, _ string, _ []string) (*subsonic.Playlist, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.playlist, f.err
+}
+
+func (f *fakeSubsonic) UpdatePlaylist(_ context.Context, _ string, _ string, _ []string, _ []int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.err
+}
+
+func (f *fakeSubsonic) ReplacePlaylistSongs(_ context.Context, _ string, _ []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.err
+}
+
+func (f *fakeSubsonic) DeletePlaylist(_ context.Context, _ string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.err
+}
+
 func (f *fakeSubsonic) StreamURL(id string) string {
 	if f.streamURL != "" {
 		return f.streamURL
@@ -686,6 +710,122 @@ func TestHandleEnqueuePlaylist(t *testing.T) {
 	fp.mu.Unlock()
 	if len(added) != 3 {
 		t.Errorf("expected 3 tracks enqueued, got %d", len(added))
+	}
+}
+
+func TestHandleCreatePlaylist(t *testing.T) {
+	srv, _, fs := newTestServer(t)
+	fs.playlist = &subsonic.Playlist{ID: "new1", Name: "My New PL"}
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist", `{"name":"My New PL"}`)
+	assertOK(t, w)
+	var pl subsonic.Playlist
+	decodeJSON(t, w.Body, &pl)
+	if pl.ID != "new1" {
+		t.Errorf("expected playlist new1, got %s", pl.ID)
+	}
+}
+
+func TestHandleCreatePlaylist_MissingName(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist", `{"name":""}`)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleRenamePlaylist(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPut, "/api/v1/playlist/p1", `{"name":"Renamed"}`)
+	assertOK(t, w)
+}
+
+func TestHandleRenamePlaylist_MissingName(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPut, "/api/v1/playlist/p1", `{"name":""}`)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleAddSongsToPlaylist(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist/p1/songs", `{"songIds":["s1","s2"]}`)
+	assertOK(t, w)
+}
+
+func TestHandleAddSongsToPlaylist_Empty(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist/p1/songs", `{"songIds":[]}`)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleAddAlbumToPlaylist(t *testing.T) {
+	srv, _, fs := newTestServer(t)
+	fs.album = &subsonic.Album{
+		ID:    "a1",
+		Songs: []subsonic.Song{{ID: "s1"}, {ID: "s2"}},
+	}
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist/p1/album/a1", "")
+	assertOK(t, w)
+}
+
+func TestHandleRemoveSongFromPlaylist(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodDelete, "/api/v1/playlist/p1/songs/2", "")
+	assertOK(t, w)
+}
+
+func TestHandleRemoveSongFromPlaylist_InvalidIndex(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodDelete, "/api/v1/playlist/p1/songs/notanumber", "")
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestHandleReplacePlaylistSongs(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPut, "/api/v1/playlist/p1/songs", `{"songIds":["s2","s1"]}`)
+	assertOK(t, w)
+}
+
+func TestHandleDeletePlaylist(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodDelete, "/api/v1/playlist/p1", "")
+	assertOK(t, w)
+}
+
+func TestHandleAppendQueueToPlaylist(t *testing.T) {
+	srv, fp, _ := newTestServer(t)
+	fp.mu.Lock()
+	fp.state.Queue = []player.Track{{ID: "t1"}, {ID: "t2"}}
+	fp.mu.Unlock()
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist/p1/add-queue", "")
+	assertOK(t, w)
+}
+
+func TestHandleSaveQueueAsPlaylist(t *testing.T) {
+	srv, fp, fs := newTestServer(t)
+	fp.mu.Lock()
+	fp.state.Queue = []player.Track{{ID: "t1"}}
+	fp.mu.Unlock()
+	fs.playlist = &subsonic.Playlist{ID: "saved1", Name: "Saved Queue"}
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist/from-queue", `{"name":"Saved Queue"}`)
+	assertOK(t, w)
+	var pl subsonic.Playlist
+	decodeJSON(t, w.Body, &pl)
+	if pl.ID != "saved1" {
+		t.Errorf("expected playlist saved1, got %s", pl.ID)
+	}
+}
+
+func TestHandleSaveQueueAsPlaylist_MissingName(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodPost, "/api/v1/playlist/from-queue", `{"name":""}`)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
 	}
 }
 

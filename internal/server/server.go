@@ -33,6 +33,10 @@ type SubsonicClient interface {
 	GetSong(ctx context.Context, id string) (*subsonic.Song, error)
 	GetPlaylists(ctx context.Context) ([]subsonic.Playlist, error)
 	GetPlaylist(ctx context.Context, id string) (*subsonic.Playlist, error)
+	CreatePlaylist(ctx context.Context, name string, songIDs []string) (*subsonic.Playlist, error)
+	UpdatePlaylist(ctx context.Context, id, name string, songIDsToAdd []string, songIndexesToRemove []int) error
+	ReplacePlaylistSongs(ctx context.Context, id string, songIDs []string) error
+	DeletePlaylist(ctx context.Context, id string) error
 	Search(ctx context.Context, query string) (*subsonic.SearchResult, error)
 	Scrobble(ctx context.Context, id string) error
 	SetRating(ctx context.Context, id string, rating int) error
@@ -344,6 +348,15 @@ func (s *Server) Handler() http.Handler {
 		// ── Playlists ─────────────────────────────────────────────────────
 		r.Get("/api/v1/playlists", s.handlePlaylists)
 		r.Get("/api/v1/playlist/{id}", s.handlePlaylist)
+		r.Post("/api/v1/playlist", s.handleCreatePlaylist)
+		r.Put("/api/v1/playlist/{id}", s.handleRenamePlaylist)
+		r.Post("/api/v1/playlist/{id}/songs", s.handleAddSongsToPlaylist)
+		r.Delete("/api/v1/playlist/{id}/songs/{index}", s.handleRemoveSongFromPlaylist)
+		r.Put("/api/v1/playlist/{id}/songs", s.handleReplacePlaylistSongs)
+		r.Delete("/api/v1/playlist/{id}", s.handleDeletePlaylist)
+		r.Post("/api/v1/playlist/{id}/add-queue", s.handleAppendQueueToPlaylist)
+		r.Post("/api/v1/playlist/{id}/album/{albumId}", s.handleAddAlbumToPlaylist)
+		r.Post("/api/v1/playlist/from-queue", s.handleSaveQueueAsPlaylist)
 		r.Post("/api/v1/play/playlist/{id}", s.handlePlayPlaylist)
 		r.Post("/api/v1/queue/playlist/{id}", s.handleEnqueuePlaylist)
 
@@ -772,6 +785,189 @@ func (s *Server) handleEnqueuePlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 	s.player.AddAllToQueue(tracks)
 	s.ok(w)
+}
+
+func (s *Server) handleCreatePlaylist(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name    string   `json:"name"`
+		SongIDs []string `json:"songIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if body.Name == "" {
+		s.errorf(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	pl, err := s.client.CreatePlaylist(r.Context(), body.Name, body.SongIDs)
+	if err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.json(w, pl)
+}
+
+func (s *Server) handleRenamePlaylist(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if body.Name == "" {
+		s.errorf(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if err := s.client.UpdatePlaylist(r.Context(), id, body.Name, nil, nil); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleAddSongsToPlaylist(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var body struct {
+		SongIDs []string `json:"songIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if len(body.SongIDs) == 0 {
+		s.errorf(w, http.StatusBadRequest, "songIds is required")
+		return
+	}
+	if err := s.client.UpdatePlaylist(r.Context(), id, "", body.SongIDs, nil); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleAddAlbumToPlaylist(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	albumID := chi.URLParam(r, "albumId")
+	album, err := s.getAlbum(r.Context(), albumID)
+	if err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	songIDs := make([]string, len(album.Songs))
+	for i, song := range album.Songs {
+		songIDs[i] = song.ID
+	}
+	if len(songIDs) == 0 {
+		s.ok(w)
+		return
+	}
+	if err := s.client.UpdatePlaylist(r.Context(), id, "", songIDs, nil); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleRemoveSongFromPlaylist(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	idxStr := chi.URLParam(r, "index")
+	idx, err := strconv.Atoi(idxStr)
+	if err != nil || idx < 0 {
+		s.errorf(w, http.StatusBadRequest, "invalid index %q", idxStr)
+		return
+	}
+	if err := s.client.UpdatePlaylist(r.Context(), id, "", nil, []int{idx}); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleReplacePlaylistSongs(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var body struct {
+		SongIDs []string `json:"songIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if err := s.client.ReplacePlaylistSongs(r.Context(), id, body.SongIDs); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleDeletePlaylist(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := s.client.DeletePlaylist(r.Context(), id); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleAppendQueueToPlaylist(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	queue := s.player.GetState().Queue
+	songIDs := make([]string, len(queue))
+	for i, t := range queue {
+		songIDs[i] = t.ID
+	}
+	if len(songIDs) == 0 {
+		s.ok(w)
+		return
+	}
+	if err := s.client.UpdatePlaylist(r.Context(), id, "", songIDs, nil); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.playlist.Delete(id)
+	s.ok(w)
+}
+
+func (s *Server) handleSaveQueueAsPlaylist(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if body.Name == "" {
+		s.errorf(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	queue := s.player.GetState().Queue
+	songIDs := make([]string, len(queue))
+	for i, t := range queue {
+		songIDs[i] = t.ID
+	}
+	pl, err := s.client.CreatePlaylist(r.Context(), body.Name, songIDs)
+	if err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.playlists.Delete(playlistsKey)
+	s.json(w, pl)
 }
 
 // handleCoverArt proxies cover art from Navidrome, keeping credentials

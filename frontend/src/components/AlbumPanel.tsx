@@ -1,7 +1,8 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList, StarRating } from './Panel';
+import { PlaylistPickerDialog } from './PlaylistPickerDialog';
 import { apiUrl } from '../api';
-import type { Artist, Album } from '../types';
-import { PlusIcon, Play } from 'lucide-react';
+import type { Artist, Album, Playlist } from '../types';
+import { PlusIcon, Play, ListPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,10 +11,12 @@ interface Props {
 	selectedArtist: Artist | null;
 	selectedAlbum: Album | null;
 	loading: boolean;
+	playlists: Playlist[];
 	onSelect: (album: Album) => void;
 	onPlay: (id: string) => void;
 	onEnqueue: (id: string) => void;
 	onRateAlbum: (id: string, rating: number) => void;
+	onAddAlbumToPlaylist: (playlistId: string, albumId: string) => void;
 	onBack?: () => void;
 	className?: string;
 }
@@ -23,15 +26,18 @@ export function AlbumPanel({
 	selectedArtist,
 	selectedAlbum,
 	loading,
+	playlists,
 	onSelect,
 	onPlay,
 	onEnqueue,
 	onRateAlbum,
+	onAddAlbumToPlaylist,
 	onBack,
 	className
 }: Props) {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState('');
+	const [pickerAlbumId, setPickerAlbumId] = useState<string | null>(null);
 
 	const filtered = query.trim() ? albums.filter((a) => a.name.toLowerCase().includes(query.toLowerCase())) : albums;
 
@@ -89,10 +95,25 @@ export function AlbumPanel({
 								}}>
 								<PlusIcon size={16} />
 							</button>
+							<button
+								className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 text-dim hover:text-brand transition-opacity p-2.5 rounded hover:bg-bg3 pr-0.5!"
+								title={t('playlistPanel.addToPlaylistTitle')}
+								onClick={(e) => {
+									e.stopPropagation();
+									setPickerAlbumId(a.id);
+								}}>
+								<ListPlus size={15} />
+							</button>
 						</ListItem>
 					))
 				)}
 			</PanelList>
+			<PlaylistPickerDialog
+				open={pickerAlbumId !== null}
+				playlists={playlists}
+				onPick={(playlistId) => onAddAlbumToPlaylist(playlistId, pickerAlbumId ?? '')}
+				onClose={() => setPickerAlbumId(null)}
+			/>
 		</Panel>
 	);
 }

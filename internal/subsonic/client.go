@@ -236,6 +236,56 @@ func (c *Client) SetRating(ctx context.Context, id string, rating int) error {
 	return err
 }
 
+// CreatePlaylist creates a new playlist with the given name and optional song IDs.
+// Returns the created playlist (Subsonic returns it in the response envelope).
+func (c *Client) CreatePlaylist(ctx context.Context, name string, songIDs []string) (*Playlist, error) {
+	p := url.Values{"name": {name}}
+	for _, id := range songIDs {
+		p.Add("songId", id)
+	}
+	resp, err := c.get(ctx, "createPlaylist", p)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Playlist, nil
+}
+
+// UpdatePlaylist updates an existing playlist's name and/or modifies its songs.
+// name may be empty to leave the name unchanged.
+// songIDsToAdd and songIndexesToRemove may be nil/empty.
+func (c *Client) UpdatePlaylist(ctx context.Context, id, name string, songIDsToAdd []string, songIndexesToRemove []int) error {
+	p := url.Values{"playlistId": {id}}
+	if name != "" {
+		p.Set("name", name)
+	}
+	for _, sid := range songIDsToAdd {
+		p.Add("songIdToAdd", sid)
+	}
+	for _, idx := range songIndexesToRemove {
+		p.Add("songIndexToRemove", strconv.Itoa(idx))
+	}
+	_, err := c.get(ctx, "updatePlaylist", p)
+	return err
+}
+
+// ReplacePlaylistSongs replaces all songs in an existing playlist with the given
+// ordered list of song IDs. This is the only way to reorder playlist entries via
+// the Subsonic API (createPlaylist with an existing playlistId).
+func (c *Client) ReplacePlaylistSongs(ctx context.Context, id string, songIDs []string) error {
+	p := url.Values{"playlistId": {id}}
+	for _, sid := range songIDs {
+		p.Add("songId", sid)
+	}
+	_, err := c.get(ctx, "createPlaylist", p)
+	return err
+}
+
+// DeletePlaylist deletes the playlist with the given ID.
+func (c *Client) DeletePlaylist(ctx context.Context, id string) error {
+	_, err := c.get(ctx, "deletePlaylist", url.Values{"id": {id}})
+	return err
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 func (c *Client) authParams() url.Values {

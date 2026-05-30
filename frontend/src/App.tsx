@@ -129,12 +129,15 @@ export default function App() {
 	);
 
 	const searchProps = {
+		playlists: lib.playlists,
 		onSelectArtist: handleSelectArtist,
 		onSelectAlbum: handleSelectAlbum,
 		onPlayAlbum: controls.playAlbum,
 		onEnqueueAlbum: controls.enqueueAlbum,
 		onPlaySong: controls.playSong,
-		onEnqueueSong: controls.enqueueSong
+		onEnqueueSong: controls.enqueueSong,
+		onAddAlbumToPlaylist: lib.addAlbumToPlaylist,
+		onAddSongToPlaylist: (playlistId: string, songId: string) => lib.addSongsToPlaylist(playlistId, [songId])
 	};
 
 	const playlistBrowserProps = {
@@ -148,7 +151,12 @@ export default function App() {
 		onPlayPlaylist: controls.playPlaylist,
 		onEnqueuePlaylist: controls.enqueuePlaylist,
 		onPlaySong: controls.playSong,
-		onEnqueueSong: controls.enqueueSong
+		onEnqueueSong: controls.enqueueSong,
+		onRenamePlaylist: lib.renamePlaylist,
+		onDeletePlaylist: lib.deletePlaylist,
+		onRemoveSongFromPlaylist: lib.removeSongFromPlaylist,
+		onReorderPlaylist: lib.reorderPlaylist,
+		onAppendQueueToPlaylist: lib.appendQueueToPlaylist
 	};
 
 	return (
@@ -174,10 +182,12 @@ export default function App() {
 					selectedArtist={lib.selectedArtist}
 					selectedAlbum={lib.selectedAlbum}
 					loading={lib.loading.albums}
+					playlists={lib.playlists}
 					onSelect={handleSelectAlbum}
 					onPlay={controls.playAlbum}
 					onEnqueue={controls.enqueueAlbum}
 					onRateAlbum={lib.setAlbumRating}
+					onAddAlbumToPlaylist={lib.addAlbumToPlaylist}
 					onBack={() => setMobileTab('artists')}
 				/>
 				<TrackPanel
@@ -186,11 +196,14 @@ export default function App() {
 					selectedAlbum={lib.selectedAlbum}
 					playerState={playerState}
 					loading={lib.loading.tracks}
+					playlists={lib.playlists}
 					onPlayAlbum={controls.playAlbum}
 					onEnqueueAlbum={controls.enqueueAlbum}
 					onPlaySong={controls.playSong}
 					onEnqueueSong={controls.enqueueSong}
 					onRateSong={lib.setSongRating}
+					onAddSongToPlaylist={(playlistId, songId) => lib.addSongsToPlaylist(playlistId, [songId])}
+					onAddAlbumToPlaylist={lib.addAlbumToPlaylist}
 					onBack={() => setMobileTab('albums')}
 				/>
 				<QueuePanel
@@ -204,6 +217,8 @@ export default function App() {
 					onClearPlaylist={lib.clearSelectedPlaylist}
 					onPlayPlaylist={controls.playPlaylist}
 					onEnqueuePlaylist={controls.enqueuePlaylist}
+					onCreatePlaylist={lib.createPlaylist}
+					onSaveQueueAsPlaylist={lib.saveQueueAsPlaylist}
 				/>
 				{/* Mobile-only search panel */}
 				<SearchPanel className={cn('flex-1 lg:hidden', mobileTab !== 'search' && 'hidden')} {...searchProps} />

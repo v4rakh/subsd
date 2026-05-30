@@ -1,17 +1,21 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, EmptyState, SkeletonList } from './Panel';
+import { PlaylistPickerDialog } from './PlaylistPickerDialog';
 import { apiFetch, apiUrl } from '../api';
-import type { Artist, Album, Song, SearchResult } from '../types';
-import { Play, PlusIcon } from 'lucide-react';
+import type { Artist, Album, Song, SearchResult, Playlist } from '../types';
+import { Play, PlusIcon, ListPlus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
+	playlists: Playlist[];
 	onSelectArtist: (artist: Artist) => void;
 	onSelectAlbum: (album: Album) => void;
 	onPlayAlbum: (id: string) => void;
 	onEnqueueAlbum: (id: string) => void;
 	onPlaySong: (id: string) => void;
 	onEnqueueSong: (id: string) => void;
+	onAddAlbumToPlaylist: (playlistId: string, albumId: string) => void;
+	onAddSongToPlaylist: (playlistId: string, songId: string) => void;
 	className?: string;
 	embedded?: boolean;
 }
@@ -57,12 +61,14 @@ function AlbumRow({
 	album,
 	onSelect,
 	onPlay,
-	onEnqueue
+	onEnqueue,
+	onAddToPlaylist
 }: {
 	album: Album;
 	onSelect: (a: Album) => void;
 	onPlay: (id: string) => void;
 	onEnqueue: (id: string) => void;
+	onAddToPlaylist: (id: string) => void;
 }) {
 	const { t } = useTranslation();
 	return (
@@ -109,6 +115,15 @@ function AlbumRow({
 				}}>
 				<PlusIcon size={16} />
 			</button>
+			<button
+				className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 text-dim hover:text-brand transition-opacity p-2.5 rounded hover:bg-bg3"
+				title={t('playlistPanel.addToPlaylistTitle')}
+				onClick={(e) => {
+					e.stopPropagation();
+					onAddToPlaylist(album.id);
+				}}>
+				<ListPlus size={15} />
+			</button>
 		</div>
 	);
 }
@@ -116,11 +131,13 @@ function AlbumRow({
 function SongRow({
 	song,
 	onPlay,
-	onEnqueue
+	onEnqueue,
+	onAddToPlaylist
 }: {
 	song: Song;
 	onPlay: (id: string) => void;
 	onEnqueue: (id: string) => void;
+	onAddToPlaylist: (id: string) => void;
 }) {
 	const { t } = useTranslation();
 	return (
@@ -154,17 +171,29 @@ function SongRow({
 				}}>
 				<PlusIcon size={14} />
 			</button>
+			<button
+				className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 text-dim hover:text-brand transition-opacity p-2.5 rounded hover:bg-bg3"
+				title={t('playlistPanel.addToPlaylistTitle')}
+				onClick={(e) => {
+					e.stopPropagation();
+					onAddToPlaylist(song.id);
+				}}>
+				<ListPlus size={13} />
+			</button>
 		</div>
 	);
 }
 
 export function SearchPanel({
+	playlists,
 	onSelectArtist,
 	onSelectAlbum,
 	onPlayAlbum,
 	onEnqueueAlbum,
 	onPlaySong,
 	onEnqueueSong,
+	onAddAlbumToPlaylist,
+	onAddSongToPlaylist,
 	className,
 	embedded
 }: Props) {
@@ -172,6 +201,7 @@ export function SearchPanel({
 	const [query, setQuery] = useState('');
 	const [results, setResults] = useState<SearchResult | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [picker, setPicker] = useState<{ type: 'album' | 'song'; id: string } | null>(null);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const abortRef = useRef<AbortController | null>(null);
 
@@ -242,6 +272,7 @@ export function SearchPanel({
 										onSelect={onSelectAlbum}
 										onPlay={onPlayAlbum}
 										onEnqueue={onEnqueueAlbum}
+										onAddToPlaylist={(id) => setPicker({ type: 'album', id })}
 									/>
 								))}
 							</>
@@ -250,13 +281,29 @@ export function SearchPanel({
 							<>
 								<SectionHeader label={t('tabs.tracks')} />
 								{songs.map((s) => (
-									<SongRow key={s.id} song={s} onPlay={onPlaySong} onEnqueue={onEnqueueSong} />
+									<SongRow
+										key={s.id}
+										song={s}
+										onPlay={onPlaySong}
+										onEnqueue={onEnqueueSong}
+										onAddToPlaylist={(id) => setPicker({ type: 'song', id })}
+									/>
 								))}
 							</>
 						)}
 					</>
 				)}
 			</PanelList>
+			<PlaylistPickerDialog
+				open={picker !== null}
+				playlists={playlists}
+				onPick={(playlistId) => {
+					if (!picker) return;
+					if (picker.type === 'album') onAddAlbumToPlaylist(playlistId, picker.id);
+					else onAddSongToPlaylist(playlistId, picker.id);
+				}}
+				onClose={() => setPicker(null)}
+			/>
 		</>
 	);
 

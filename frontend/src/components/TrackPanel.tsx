@@ -1,7 +1,8 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList, StarRating } from './Panel';
-import type { Album, Song, PlayerState } from '../types';
+import { PlaylistPickerDialog } from './PlaylistPickerDialog';
+import type { Album, Song, PlayerState, Playlist } from '../types';
 import { fmtDuration, fmtAudioMeta } from '@/lib/format';
-import { PlusIcon, Play } from 'lucide-react';
+import { PlusIcon, Play, ListPlus } from 'lucide-react';
 import { useEffect, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,11 +11,14 @@ interface Props {
 	selectedAlbum: Album | null;
 	playerState: PlayerState;
 	loading: boolean;
+	playlists: Playlist[];
 	onPlayAlbum: (id: string) => void;
 	onEnqueueAlbum: (id: string) => void;
 	onPlaySong: (id: string) => void;
 	onEnqueueSong: (id: string) => void;
 	onRateSong: (id: string, rating: number) => void;
+	onAddSongToPlaylist: (playlistId: string, songId: string) => void;
+	onAddAlbumToPlaylist: (playlistId: string, albumId: string) => void;
 	onBack?: () => void;
 	className?: string;
 }
@@ -24,11 +28,14 @@ export function TrackPanel({
 	selectedAlbum,
 	playerState,
 	loading,
+	playlists,
 	onPlayAlbum,
 	onEnqueueAlbum,
 	onPlaySong,
 	onEnqueueSong,
 	onRateSong,
+	onAddSongToPlaylist,
+	onAddAlbumToPlaylist,
 	onBack,
 	className
 }: Props) {
@@ -36,6 +43,8 @@ export function TrackPanel({
 	const [query, setQuery] = useState('');
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [lastClickedId, setLastClickedId] = useState<string | null>(null);
+	const [pickerSongId, setPickerSongId] = useState<string | null>(null);
+	const [pickerAlbum, setPickerAlbum] = useState(false);
 	const currentId = playerState.queue[playerState.currentIdx]?.id;
 
 	useEffect(() => {
@@ -117,6 +126,12 @@ export function TrackPanel({
 								? t('trackPanel.enqueueSelected', { count: selected.size })
 								: t('trackPanel.queueButton')}
 						</button>
+						<button
+							className="text-dim hover:text-brand hover:bg-bg2 transition-colors p-2 rounded"
+							onClick={() => setPickerAlbum(true)}
+							title={t('playlistPanel.addToPlaylistTitle')}>
+							<ListPlus size={15} />
+						</button>
 					</div>
 				)}
 			</PanelHeader>
@@ -160,6 +175,15 @@ export function TrackPanel({
 								}}>
 								<PlusIcon size={14} />
 							</button>
+							<button
+								className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 text-dim hover:text-brand transition-opacity p-2.5 rounded hover:bg-bg3"
+								title={t('playlistPanel.addToPlaylistTitle')}
+								onClick={(e) => {
+									e.stopPropagation();
+									setPickerSongId(s.id);
+								}}>
+								<ListPlus size={13} />
+							</button>
 							<span className="text-dim shrink-0">{fmtDuration(s.duration)}</span>
 						</ListItem>
 					))
@@ -178,6 +202,18 @@ export function TrackPanel({
 					</button>
 				</div>
 			)}
+			<PlaylistPickerDialog
+				open={pickerSongId !== null}
+				playlists={playlists}
+				onPick={(playlistId) => onAddSongToPlaylist(playlistId, pickerSongId ?? '')}
+				onClose={() => setPickerSongId(null)}
+			/>
+			<PlaylistPickerDialog
+				open={pickerAlbum}
+				playlists={playlists}
+				onPick={(playlistId) => onAddAlbumToPlaylist(playlistId, selectedAlbum?.id ?? '')}
+				onClose={() => setPickerAlbum(false)}
+			/>
 		</Panel>
 	);
 }

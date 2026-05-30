@@ -1,11 +1,12 @@
 import { Panel, PanelHeader, PanelList, PanelSearch, EmptyState } from './Panel';
 import { PlaylistBrowser } from './PlaylistBrowser';
 import type { PlayerState, Track, Playlist, Song } from '../types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { cn } from '@/lib/utils';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { XIcon, GripVertical, Play } from 'lucide-react';
+import { XIcon, GripVertical, Play, ListPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -90,6 +91,13 @@ interface Props {
 	onEnqueuePlaylist: (id: string) => void;
 	onPlaySong: (id: string) => void;
 	onEnqueueSong: (id: string) => void;
+	onSaveQueueAsPlaylist?: (name: string) => Promise<void>;
+	onCreatePlaylist?: (name: string) => Promise<void>;
+	onRenamePlaylist?: (id: string, newName: string) => Promise<void>;
+	onDeletePlaylist?: (id: string) => Promise<void>;
+	onRemoveSongFromPlaylist?: (id: string, index: number) => Promise<void>;
+	onReorderPlaylist?: (id: string, newSongIds: string[]) => Promise<void>;
+	onAppendQueueToPlaylist?: (id: string) => Promise<void>;
 	className?: string;
 }
 
@@ -110,11 +118,22 @@ export function QueuePanel({
 	onEnqueuePlaylist,
 	onPlaySong,
 	onEnqueueSong,
+	onSaveQueueAsPlaylist,
+	onCreatePlaylist,
+	onRenamePlaylist,
+	onDeletePlaylist,
+	onRemoveSongFromPlaylist,
+	onReorderPlaylist,
+	onAppendQueueToPlaylist,
 	className
 }: Props) {
 	const { t } = useTranslation();
 	const [query, setQuery] = useState('');
 	const [mode, setMode] = useState<'queue' | 'playlists'>('queue');
+	const [saveQueueDialog, setSaveQueueDialog] = useState(false);
+	const [saveQueueName, setSaveQueueName] = useState('');
+	const [createDialog, setCreateDialog] = useState(false);
+	const [createName, setCreateName] = useState('');
 	const { queue, currentIdx } = playerState;
 
 	const filtered = query.trim()
@@ -139,6 +158,14 @@ export function QueuePanel({
 	}
 
 	const queueLabel = `${t('queuePanel.title')}${queue.length ? ' · ' + queue.length : ''}`;
+
+	const playlistBrowserMutationProps = {
+		onRenamePlaylist,
+		onDeletePlaylist,
+		onRemoveSongFromPlaylist,
+		onReorderPlaylist,
+		onAppendQueueToPlaylist
+	};
 
 	if (mode === 'playlists') {
 		if (selectedPlaylist) {
@@ -177,6 +204,7 @@ export function QueuePanel({
 						onEnqueuePlaylist={onEnqueuePlaylist}
 						onPlaySong={onPlaySong}
 						onEnqueueSong={onEnqueueSong}
+						{...playlistBrowserMutationProps}
 					/>
 				</Panel>
 			);
@@ -190,6 +218,17 @@ export function QueuePanel({
 						onClick={() => setMode('queue')}>
 						← {t('queuePanel.title')}
 					</button>
+					{onCreatePlaylist && (
+						<button
+							className="text-sm text-dim hover:text-brand transition-colors px-2 py-1.5 rounded hover:bg-bg2 shrink-0"
+							title={t('playlistPanel.newPlaylist')}
+							onClick={() => {
+								setCreateName('');
+								setCreateDialog(true);
+							}}>
+							+ {t('playlistPanel.newPlaylist')}
+						</button>
+					)}
 				</PanelHeader>
 				<PlaylistBrowser
 					playlists={playlists}
@@ -202,62 +241,154 @@ export function QueuePanel({
 					onEnqueuePlaylist={onEnqueuePlaylist}
 					onPlaySong={onPlaySong}
 					onEnqueueSong={onEnqueueSong}
+					{...playlistBrowserMutationProps}
 				/>
 			</Panel>
 		);
 	}
 
 	return (
-		<Panel className={className}>
-			<PanelHeader title={queueLabel}>
-				<button
-					className="hidden lg:block text-sm text-dim hover:text-brand transition-colors px-2 py-1.5 rounded hover:bg-bg2"
-					onClick={() => setMode('playlists')}>
-					{t('tabs.playlists')}
-				</button>
-				{queue.length > 0 && (
+		<>
+			<Panel className={className}>
+				<PanelHeader title={queueLabel}>
 					<button
-						className="text-sm text-dim hover:text-red hover:bg-bg2 transition-colors px-3 py-1.5 rounded pr-2!"
-						onClick={onClear}
-						title={t('queuePanel.clearTitle')}>
-						✕ {t('queuePanel.clearButton')}
+						className="hidden lg:block text-sm text-dim hover:text-brand transition-colors px-2 py-1.5 rounded hover:bg-bg2"
+						onClick={() => setMode('playlists')}>
+						{t('tabs.playlists')}
 					</button>
-				)}
-			</PanelHeader>
-			<PanelSearch value={query} onChange={setQuery} placeholder={t('queuePanel.searchPlaceholder')} />
-			<PanelList>
-				{queue.length === 0 ? (
-					<EmptyState text={t('queuePanel.empty')} />
-				) : canDrag ? (
-					<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-						<SortableContext
-							items={filtered.map(({ i }) => String(i))}
-							strategy={verticalListSortingStrategy}>
-							{filtered.map(({ track, i }) => (
-								<SortableRow
-									key={`${track.id}-${i}`}
-									track={track}
-									i={i}
-									currentIdx={currentIdx}
-									onJump={onJump}
-									onRemove={onRemove}
-								/>
-							))}
-						</SortableContext>
-					</DndContext>
-				) : (
-					filtered.map(({ track, i }) => (
-						<QueueRow
-							key={`${track.id}-${i}`}
-							track={track}
-							i={i}
-							currentIdx={currentIdx}
-							onJump={onJump}
-							onRemove={onRemove}
+					{onSaveQueueAsPlaylist && queue.length > 0 && (
+						<button
+							className="text-dim hover:text-brand transition-colors p-2 rounded hover:bg-bg2"
+							title={t('playlistPanel.saveQueueTitle')}
+							onClick={() => {
+								setSaveQueueName('');
+								setSaveQueueDialog(true);
+							}}>
+							<ListPlus size={15} />
+						</button>
+					)}
+					{queue.length > 0 && (
+						<button
+							className="text-sm text-dim hover:text-red hover:bg-bg2 transition-colors px-3 py-1.5 rounded pr-2!"
+							onClick={onClear}
+							title={t('queuePanel.clearTitle')}>
+							✕ {t('queuePanel.clearButton')}
+						</button>
+					)}
+				</PanelHeader>
+				<PanelSearch value={query} onChange={setQuery} placeholder={t('queuePanel.searchPlaceholder')} />
+				<PanelList>
+					{queue.length === 0 ? (
+						<EmptyState text={t('queuePanel.empty')} />
+					) : canDrag ? (
+						<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+							<SortableContext
+								items={filtered.map(({ i }) => String(i))}
+								strategy={verticalListSortingStrategy}>
+								{filtered.map(({ track, i }) => (
+									<SortableRow
+										key={`${track.id}-${i}`}
+										track={track}
+										i={i}
+										currentIdx={currentIdx}
+										onJump={onJump}
+										onRemove={onRemove}
+									/>
+								))}
+							</SortableContext>
+						</DndContext>
+					) : (
+						filtered.map(({ track, i }) => (
+							<QueueRow
+								key={`${track.id}-${i}`}
+								track={track}
+								i={i}
+								currentIdx={currentIdx}
+								onJump={onJump}
+								onRemove={onRemove}
+							/>
+						))
+					)}
+				</PanelList>
+			</Panel>
+			{onCreatePlaylist && (
+				<Dialog open={createDialog} onOpenChange={(o) => !o && setCreateDialog(false)}>
+					<DialogContent showCloseButton={false}>
+						<DialogHeader>
+							<DialogTitle>{t('playlistPanel.createTitle')}</DialogTitle>
+						</DialogHeader>
+						<input
+							className="w-full rounded border border-border bg-bg2 px-3 py-2 text-sm text-text placeholder:text-dim focus:outline-none focus:ring-1 focus:ring-brand"
+							placeholder={t('playlistPanel.namePlaceholder')}
+							value={createName}
+							autoFocus
+							onChange={(e) => setCreateName(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' && createName.trim()) {
+									onCreatePlaylist(createName.trim());
+									setCreateDialog(false);
+								}
+								if (e.key === 'Escape') setCreateDialog(false);
+							}}
 						/>
-					))
-				)}
-			</PanelList>
-		</Panel>
+						<DialogFooter>
+							<button
+								className="text-sm px-3 py-1.5 rounded bg-bg3 hover:bg-bg2 text-dim transition-colors"
+								onClick={() => setCreateDialog(false)}>
+								{t('playlistPanel.cancelButton')}
+							</button>
+							<button
+								className="text-sm px-3 py-1.5 rounded bg-brand text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+								disabled={!createName.trim()}
+								onClick={() => {
+									onCreatePlaylist(createName.trim());
+									setCreateDialog(false);
+								}}>
+								{t('playlistPanel.createButton')}
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
+			{onSaveQueueAsPlaylist && (
+				<Dialog open={saveQueueDialog} onOpenChange={(o) => !o && setSaveQueueDialog(false)}>
+					<DialogContent showCloseButton={false}>
+						<DialogHeader>
+							<DialogTitle>{t('playlistPanel.saveQueueTitle')}</DialogTitle>
+						</DialogHeader>
+						<input
+							className="w-full rounded border border-border bg-bg2 px-3 py-2 text-sm text-text placeholder:text-dim focus:outline-none focus:ring-1 focus:ring-brand"
+							placeholder={t('playlistPanel.namePlaceholder')}
+							value={saveQueueName}
+							autoFocus
+							onChange={(e) => setSaveQueueName(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' && saveQueueName.trim()) {
+									onSaveQueueAsPlaylist(saveQueueName.trim());
+									setSaveQueueDialog(false);
+								}
+								if (e.key === 'Escape') setSaveQueueDialog(false);
+							}}
+						/>
+						<DialogFooter>
+							<button
+								className="text-sm px-3 py-1.5 rounded bg-bg3 hover:bg-bg2 text-dim transition-colors"
+								onClick={() => setSaveQueueDialog(false)}>
+								{t('playlistPanel.cancelButton')}
+							</button>
+							<button
+								className="text-sm px-3 py-1.5 rounded bg-brand text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+								disabled={!saveQueueName.trim()}
+								onClick={() => {
+									onSaveQueueAsPlaylist(saveQueueName.trim());
+									setSaveQueueDialog(false);
+								}}>
+								{t('playlistPanel.saveQueue')}
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
+		</>
 	);
 }

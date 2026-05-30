@@ -121,6 +121,17 @@ func (c *remoteCLIClient) post(ctx context.Context, path string, body any) error
 	return nil
 }
 
+func (c *remoteCLIClient) put(ctx context.Context, path string, body any) error {
+	data, status, err := c.request(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return err
+	}
+	if status >= 300 {
+		return fmt.Errorf("server error %d: %s", status, string(data))
+	}
+	return nil
+}
+
 func (c *remoteCLIClient) delete(ctx context.Context, path string) error {
 	data, status, err := c.request(ctx, http.MethodDelete, path, nil)
 	if err != nil {
@@ -580,6 +591,203 @@ var remoteCommand = &cli.Command{
 							return err
 						}
 						return c.post(ctx, "/api/v1/queue/artist/"+id, nil)
+					},
+				},
+				{
+					Name:      "save-as-playlist",
+					Usage:     "Save the current queue as a new playlist",
+					ArgsUsage: "<name>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						name, err := requireArg(cmd, "playlist name")
+						if err != nil {
+							return err
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.post(ctx, "/api/v1/playlist/from-queue", map[string]string{"name": name})
+					},
+				},
+				{
+					Name:      "append-to-playlist",
+					Usage:     "Append the current queue to an existing playlist by Subsonic ID",
+					ArgsUsage: "<playlist-id>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						id, err := requireArg(cmd, "playlist ID")
+						if err != nil {
+							return err
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.post(ctx, "/api/v1/playlist/"+id+"/add-queue", nil)
+					},
+				},
+			},
+		},
+		// ── Playlist management ───────────────────────────────────────────
+		{
+			Name:  "playlist",
+			Usage: "Manage playlists",
+			Commands: []*cli.Command{
+				{
+					Name:      "create",
+					Usage:     "Create a new empty playlist",
+					ArgsUsage: "<name>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						name, err := requireArg(cmd, "playlist name")
+						if err != nil {
+							return err
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						data, status, err := c.request(ctx, http.MethodPost, "/api/v1/playlist", map[string]any{"name": name, "songIds": []string{}})
+						if err != nil {
+							return err
+						}
+						if status >= 300 {
+							return fmt.Errorf("server error %d: %s", status, string(data))
+						}
+						return printPrettyJSON(data)
+					},
+				},
+				{
+					Name:      "delete",
+					Usage:     "Delete a playlist by Subsonic ID",
+					ArgsUsage: "<id>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						id, err := requireArg(cmd, "playlist ID")
+						if err != nil {
+							return err
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.delete(ctx, "/api/v1/playlist/"+id)
+					},
+				},
+				{
+					Name:      "rename",
+					Usage:     "Rename a playlist",
+					ArgsUsage: "<id> <new-name>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						if cmd.Args().Len() != 2 {
+							return errors.New("usage: playlist rename <id> <new-name>")
+						}
+						id := cmd.Args().Get(0)
+						name := cmd.Args().Get(1)
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.put(ctx, "/api/v1/playlist/"+id, map[string]string{"name": name})
+					},
+				},
+				{
+					Name:      "add-song",
+					Usage:     "Add a song to a playlist by Subsonic IDs",
+					ArgsUsage: "<playlist-id> <song-id>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						if cmd.Args().Len() != 2 {
+							return errors.New("usage: playlist add-song <playlist-id> <song-id>")
+						}
+						playlistID := cmd.Args().Get(0)
+						songID := cmd.Args().Get(1)
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.post(ctx, "/api/v1/playlist/"+playlistID+"/songs", map[string][]string{"songIds": {songID}})
+					},
+				},
+				{
+					Name:      "add-album",
+					Usage:     "Add all songs of an album to a playlist by Subsonic IDs",
+					ArgsUsage: "<playlist-id> <album-id>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						if cmd.Args().Len() != 2 {
+							return errors.New("usage: playlist add-album <playlist-id> <album-id>")
+						}
+						playlistID := cmd.Args().Get(0)
+						albumID := cmd.Args().Get(1)
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.post(ctx, "/api/v1/playlist/"+playlistID+"/album/"+albumID, nil)
+					},
+				},
+				{
+					Name:      "remove-song",
+					Usage:     "Remove a song from a playlist by its 0-based track index",
+					ArgsUsage: "<playlist-id> <index>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						if cmd.Args().Len() != 2 {
+							return errors.New("usage: playlist remove-song <playlist-id> <index>")
+						}
+						playlistID := cmd.Args().Get(0)
+						idx, err := strconv.Atoi(cmd.Args().Get(1))
+						if err != nil {
+							return fmt.Errorf("invalid index: %w", err)
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						return c.delete(ctx, fmt.Sprintf("/api/v1/playlist/%s/songs/%d", playlistID, idx))
+					},
+				},
+				{
+					Name:      "reorder",
+					Usage:     "Move a track within a playlist (fetches current order, applies move, saves)",
+					ArgsUsage: "<playlist-id> <from-index> <to-index>",
+					Action: func(ctx context.Context, cmd *cli.Command) error {
+						if cmd.Args().Len() != 3 {
+							return errors.New("usage: playlist reorder <playlist-id> <from-index> <to-index>")
+						}
+						playlistID := cmd.Args().Get(0)
+						from, err := strconv.Atoi(cmd.Args().Get(1))
+						if err != nil {
+							return fmt.Errorf("invalid from-index: %w", err)
+						}
+						to, err := strconv.Atoi(cmd.Args().Get(2))
+						if err != nil {
+							return fmt.Errorf("invalid to-index: %w", err)
+						}
+						c, err := clientFromCmd(cmd)
+						if err != nil {
+							return err
+						}
+						// Fetch current playlist to get song IDs.
+						data, err := c.get(ctx, "/api/v1/playlist/"+playlistID)
+						if err != nil {
+							return err
+						}
+						var pl struct {
+							Songs []struct {
+								ID string `json:"id"`
+							} `json:"entry"`
+						}
+						if err := json.Unmarshal(data, &pl); err != nil {
+							return fmt.Errorf("parse playlist: %w", err)
+						}
+						ids := make([]string, len(pl.Songs))
+						for i, s := range pl.Songs {
+							ids[i] = s.ID
+						}
+						if from < 0 || from >= len(ids) || to < 0 || to >= len(ids) {
+							return fmt.Errorf("index out of range (playlist has %d tracks)", len(ids))
+						}
+						// Apply the move.
+						moved := ids[from]
+						newIDs := append(ids[:from], ids[from+1:]...)
+						newIDs = append(newIDs[:to], append([]string{moved}, newIDs[to:]...)...)
+						return c.put(ctx, "/api/v1/playlist/"+playlistID+"/songs", map[string][]string{"songIds": newIDs})
 					},
 				},
 			},
