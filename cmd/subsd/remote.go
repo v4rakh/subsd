@@ -406,6 +406,47 @@ var remoteCommand = &cli.Command{
 				return c.post(ctx, "/api/v1/play/artist/"+id, nil)
 			},
 		},
+		// ── Ratings ───────────────────────────────────────────────────────
+		{
+			Name:      "rate-song",
+			Usage:     "Rate a song by Subsonic ID (0 removes the rating)",
+			ArgsUsage: "<id> <0-5>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				if cmd.Args().Len() != 2 {
+					return errors.New("usage: rate-song <id> <0-5>")
+				}
+				id := cmd.Args().Get(0)
+				rating, err := strconv.Atoi(cmd.Args().Get(1))
+				if err != nil || rating < 0 || rating > 5 {
+					return errors.New("rating must be an integer between 0 and 5")
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				return c.post(ctx, "/api/v1/rating", map[string]any{"id": id, "rating": rating})
+			},
+		},
+		{
+			Name:      "rate-album",
+			Usage:     "Rate an album by Subsonic ID (0 removes the rating)",
+			ArgsUsage: "<id> <0-5>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				if cmd.Args().Len() != 2 {
+					return errors.New("usage: rate-album <id> <0-5>")
+				}
+				id := cmd.Args().Get(0)
+				rating, err := strconv.Atoi(cmd.Args().Get(1))
+				if err != nil || rating < 0 || rating > 5 {
+					return errors.New("rating must be an integer between 0 and 5")
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				return c.post(ctx, "/api/v1/rating", map[string]any{"id": id, "rating": rating})
+			},
+		},
 		// ── Queue management ──────────────────────────────────────────────
 		{
 			Name:  "queue",

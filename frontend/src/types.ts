@@ -56,6 +56,7 @@ export interface Album {
 	coverArt: string;
 	year?: number;
 	songCount: number;
+	userRating?: number;
 	song?: Song[];
 }
 
@@ -77,6 +78,7 @@ export interface Song {
 	year?: number;
 	genre?: string;
 	size?: number;
+	userRating?: number;
 }
 
 export interface SearchResult {

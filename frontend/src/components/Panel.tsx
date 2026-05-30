@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
-import { XIcon, ChevronLeft } from 'lucide-react';
+import { XIcon, ChevronLeft, Star } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface PanelProps {
 	children: ReactNode;
@@ -101,6 +102,33 @@ export function PanelSearch({ value, onChange, placeholder, autoFocus }: PanelSe
 
 export function EmptyState({ text }: { text: string }) {
 	return <div className="px-6 py-10 text-dim text-center">{text}</div>;
+}
+
+interface StarRatingProps {
+	rating: number;
+	onRate: (rating: number) => void;
+}
+export function StarRating({ rating, onRate }: StarRatingProps) {
+	const { t } = useTranslation();
+	return (
+		<div className="flex items-center shrink-0">
+			{[1, 2, 3, 4, 5].map((n) => (
+				<button
+					key={n}
+					className={cn(
+						'p-0.5 transition-colors',
+						n <= rating ? 'text-yellow-400' : 'text-dim hover:text-yellow-400'
+					)}
+					title={n === rating ? t('starRating.remove') : t('starRating.rate', { n })}
+					onClick={(e) => {
+						e.stopPropagation();
+						onRate(n === rating ? 0 : n);
+					}}>
+					<Star size={11} fill={n <= rating ? 'currentColor' : 'none'} />
+				</button>
+			))}
+		</div>
+	);
 }
 
 export function SkeletonList({ rows = 8 }: { rows?: number }) {

@@ -1,4 +1,4 @@
-import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList } from './Panel';
+import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList, StarRating } from './Panel';
 import { apiUrl } from '../api';
 import type { Artist, Album } from '../types';
 import { PlusIcon, Play } from 'lucide-react';
@@ -13,6 +13,7 @@ interface Props {
 	onSelect: (album: Album) => void;
 	onPlay: (id: string) => void;
 	onEnqueue: (id: string) => void;
+	onRateAlbum: (id: string, rating: number) => void;
 	onBack?: () => void;
 	className?: string;
 }
@@ -25,6 +26,7 @@ export function AlbumPanel({
 	onSelect,
 	onPlay,
 	onEnqueue,
+	onRateAlbum,
 	onBack,
 	className
 }: Props) {
@@ -68,6 +70,7 @@ export function AlbumPanel({
 								<div className="truncate">{a.name}</div>
 								{a.year != null && <div className="text-dim">{a.year}</div>}
 							</div>
+							<StarRating rating={a.userRating ?? 0} onRate={(r) => onRateAlbum(a.id, r)} />
 							<button
 								className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 text-dim hover:text-brand transition-opacity p-2.5 rounded hover:bg-bg3 pr-0.5!"
 								title={t('albumPanel.playTitle')}

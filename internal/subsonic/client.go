@@ -47,14 +47,15 @@ type Artist struct {
 }
 
 type Album struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Artist    string `json:"artist"`
-	ArtistID  string `json:"artistId"`
-	CoverArt  string `json:"coverArt"`
-	Year      int    `json:"year"`
-	SongCount int    `json:"songCount"`
-	Songs     []Song `json:"song,omitempty"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Artist     string `json:"artist"`
+	ArtistID   string `json:"artistId"`
+	CoverArt   string `json:"coverArt"`
+	Year       int    `json:"year"`
+	SongCount  int    `json:"songCount"`
+	UserRating int    `json:"userRating,omitempty"`
+	Songs      []Song `json:"song,omitempty"`
 }
 
 type Song struct {
@@ -75,6 +76,7 @@ type Song struct {
 	Year         int    `json:"year"`
 	Genre        string `json:"genre"`
 	Size         int64  `json:"size"`
+	UserRating   int    `json:"userRating,omitempty"`
 }
 
 type SearchResult struct {
@@ -223,6 +225,14 @@ func (c *Client) CoverArtURL(id string, size int) string {
 
 func (c *Client) Scrobble(ctx context.Context, id string) error {
 	_, err := c.get(ctx, "scrobble", url.Values{"id": {id}, "submission": {"true"}})
+	return err
+}
+
+func (c *Client) SetRating(ctx context.Context, id string, rating int) error {
+	_, err := c.get(ctx, "setRating", url.Values{
+		"id":     {id},
+		"rating": {strconv.Itoa(rating)},
+	})
 	return err
 }
 

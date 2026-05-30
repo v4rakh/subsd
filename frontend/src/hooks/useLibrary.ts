@@ -29,6 +29,8 @@ export interface LibraryActions {
 	loadPlaylists: () => Promise<void>;
 	selectPlaylist: (playlist: Playlist) => Promise<void>;
 	clearSelectedPlaylist: () => void;
+	setAlbumRating: (albumId: string, rating: number) => Promise<void>;
+	setSongRating: (songId: string, rating: number) => Promise<void>;
 }
 
 export function useLibrary(): LibraryState & LibraryActions {
@@ -112,6 +114,24 @@ export function useLibrary(): LibraryState & LibraryActions {
 		setPlaylistSongs([]);
 	}, []);
 
+	const setAlbumRating = useCallback(async (albumId: string, rating: number) => {
+		setAlbums((prev) => prev.map((a) => (a.id === albumId ? { ...a, userRating: rating } : a)));
+		await apiFetch('/api/v1/rating', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: albumId, rating })
+		});
+	}, []);
+
+	const setSongRating = useCallback(async (songId: string, rating: number) => {
+		setSongs((prev) => prev.map((s) => (s.id === songId ? { ...s, userRating: rating } : s)));
+		await apiFetch('/api/v1/rating', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: songId, rating })
+		});
+	}, []);
+
 	return {
 		artists,
 		albums,
@@ -127,6 +147,8 @@ export function useLibrary(): LibraryState & LibraryActions {
 		selectAlbum,
 		loadPlaylists,
 		selectPlaylist,
-		clearSelectedPlaylist
+		clearSelectedPlaylist,
+		setAlbumRating,
+		setSongRating
 	};
 }

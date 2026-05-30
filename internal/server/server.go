@@ -35,6 +35,7 @@ type SubsonicClient interface {
 	GetPlaylist(ctx context.Context, id string) (*subsonic.Playlist, error)
 	Search(ctx context.Context, query string) (*subsonic.SearchResult, error)
 	Scrobble(ctx context.Context, id string) error
+	SetRating(ctx context.Context, id string, rating int) error
 	StreamURL(id string) string
 	CoverArtURL(id string, size int) string
 }
@@ -345,6 +346,9 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/api/v1/playlist/{id}", s.handlePlaylist)
 		r.Post("/api/v1/play/playlist/{id}", s.handlePlayPlaylist)
 		r.Post("/api/v1/queue/playlist/{id}", s.handleEnqueuePlaylist)
+
+		// ── Ratings ───────────────────────────────────────────────────────
+		r.Post("/api/v1/rating", s.handleSetRating)
 
 		// ── Audio devices ─────────────────────────────────────────────────
 		r.Get("/api/v1/devices", s.handleDevices)
@@ -815,6 +819,32 @@ func (s *Server) handleCoverArt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.WriteHeader(resp.StatusCode)
 	w.Write(data) //nolint:errcheck,gosec,gosec
+}
+
+// ── Ratings ────────────────────────────────────────────────────────────────────
+
+func (s *Server) handleSetRating(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ID     string `json:"id"`
+		Rating int    `json:"rating"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.errorf(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	if body.ID == "" {
+		s.errorf(w, http.StatusBadRequest, "id is required")
+		return
+	}
+	if body.Rating < 0 || body.Rating > 5 {
+		s.errorf(w, http.StatusBadRequest, "rating must be 0–5")
+		return
+	}
+	if err := s.client.SetRating(r.Context(), body.ID, body.Rating); err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	s.ok(w)
 }
 
 // ── Audio devices ──────────────────────────────────────────────────────────────

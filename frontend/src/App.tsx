@@ -177,6 +177,7 @@ export default function App() {
 					onSelect={handleSelectAlbum}
 					onPlay={controls.playAlbum}
 					onEnqueue={controls.enqueueAlbum}
+					onRateAlbum={lib.setAlbumRating}
 					onBack={() => setMobileTab('artists')}
 				/>
 				<TrackPanel
@@ -189,6 +190,7 @@ export default function App() {
 					onEnqueueAlbum={controls.enqueueAlbum}
 					onPlaySong={controls.playSong}
 					onEnqueueSong={controls.enqueueSong}
+					onRateSong={lib.setSongRating}
 					onBack={() => setMobileTab('albums')}
 				/>
 				<QueuePanel

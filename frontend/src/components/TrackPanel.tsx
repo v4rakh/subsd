@@ -1,4 +1,4 @@
-import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList } from './Panel';
+import { Panel, PanelHeader, PanelList, PanelSearch, ListItem, EmptyState, SkeletonList, StarRating } from './Panel';
 import type { Album, Song, PlayerState } from '../types';
 import { fmtDuration, fmtAudioMeta } from '@/lib/format';
 import { PlusIcon, Play } from 'lucide-react';
@@ -14,6 +14,7 @@ interface Props {
 	onEnqueueAlbum: (id: string) => void;
 	onPlaySong: (id: string) => void;
 	onEnqueueSong: (id: string) => void;
+	onRateSong: (id: string, rating: number) => void;
 	onBack?: () => void;
 	className?: string;
 }
@@ -27,6 +28,7 @@ export function TrackPanel({
 	onEnqueueAlbum,
 	onPlaySong,
 	onEnqueueSong,
+	onRateSong,
 	onBack,
 	className
 }: Props) {
@@ -139,6 +141,7 @@ export function TrackPanel({
 									<div className="truncate text-xs text-dim mt-0.5">{fmtAudioMeta(s)}</div>
 								)}
 							</div>
+							<StarRating rating={s.userRating ?? 0} onRate={(r) => onRateSong(s.id, r)} />
 							<button
 								className="shrink-0 lg:opacity-0 lg:group-hover:opacity-100 text-dim hover:text-brand transition-opacity p-2.5 rounded hover:bg-bg3"
 								title={t('trackPanel.playTitle')}

@@ -233,6 +233,8 @@ func (f *fakeSubsonic) Scrobble(_ context.Context, id string) error {
 	return f.err
 }
 
+func (f *fakeSubsonic) SetRating(_ context.Context, _ string, _ int) error { return f.err }
+
 func (f *fakeSubsonic) StreamURL(id string) string {
 	if f.streamURL != "" {
 		return f.streamURL

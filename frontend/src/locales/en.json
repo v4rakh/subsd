@@ -81,6 +81,10 @@
     "volumeDown": "Volume down 5%",
     "volumeUp": "Volume up 5%"
   },
+  "starRating": {
+    "rate": "Rate {{n}} stars",
+    "remove": "Remove rating"
+  },
   "tabs": {
     "albums": "Albums",
     "artists": "Artists",
