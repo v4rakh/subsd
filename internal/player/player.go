@@ -144,7 +144,7 @@ func New(backend PlaybackBackend) *Player {
 			Volume:     100,
 			CurrentIdx: -1,
 			Queue:      []Track{},
-			ReplayGain: ReplayGainOff,
+			ReplayGain: ReplayGainTrack,
 		},
 	}
 	if w, ok := backend.(wireable); ok {
@@ -228,11 +228,11 @@ func (p *Player) SetLastScrobble(status string) {
 // Volume is applied to the backend immediately; all other fields are held in
 // memory until the user presses Play. If position > 0 it will be applied via a
 // seek after the first Resume call.
-// replayGain may be empty, in which case it defaults to ReplayGainOff.
+// replayGain may be empty, in which case it defaults to ReplayGainTrack.
 func (p *Player) RestoreState(tracks []Track, currentIdx, volume int, shuffle, repeat bool, position float64, replayGain string) {
 	p.SetVolume(volume)
 	if replayGain == "" {
-		replayGain = ReplayGainOff
+		replayGain = ReplayGainTrack
 	}
 	p.mu.Lock()
 	p.state.Queue = tracks

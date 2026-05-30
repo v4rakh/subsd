@@ -618,11 +618,11 @@ func TestRestoreState(t *testing.T) {
 	}
 }
 
-func TestRestoreState_EmptyReplayGainDefaultsToOff(t *testing.T) {
+func TestRestoreState_EmptyReplayGainDefaultsToTrack(t *testing.T) {
 	p, _ := newTestPlayer()
 	p.RestoreState(nil, -1, 100, false, false, 0, "")
-	if st := p.GetState(); st.ReplayGain != ReplayGainOff {
-		t.Errorf("ReplayGain: got %q, want %q", st.ReplayGain, ReplayGainOff)
+	if st := p.GetState(); st.ReplayGain != ReplayGainTrack {
+		t.Errorf("ReplayGain: got %q, want %q", st.ReplayGain, ReplayGainTrack)
 	}
 }
 

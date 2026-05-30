@@ -81,7 +81,7 @@ func NewMPVBackend(gapless GaplessAudio) (*MPVBackend, error) {
 		cmd:        cmd,
 		socketPath: socketPath,
 		volume:     100,
-		replayGain: ReplayGainOff,
+		replayGain: ReplayGainTrack,
 		gapless:    gapless,
 		closeCh:    make(chan struct{}),
 	}, nil
@@ -156,11 +156,12 @@ func (b *MPVBackend) SetVolume(vol int) {
 	b.ipc().Set("volume", vol) //nolint:errcheck,gosec
 }
 
-// SetReplayGain stores the mode; it is applied to mpv before the next loadfile.
+// SetReplayGain stores the mode and applies it to mpv immediately.
 func (b *MPVBackend) SetReplayGain(mode string) {
 	b.mu.Lock()
 	b.replayGain = mode
 	b.mu.Unlock()
+	b.ipc().Set("replaygain", mode) //nolint:errcheck,gosec
 }
 
 // Stop halts mpv and discards the loaded file.
