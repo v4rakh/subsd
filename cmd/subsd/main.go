@@ -72,6 +72,9 @@ const (
 	flagGaplessAudio = "gapless-audio"
 
 	flagMPRIS = "mpris"
+
+	flagLyricsEnabled       = "lyrics-enabled"
+	flagLyricsLRCLibEnabled = "lyrics-lrclib-enabled"
 )
 
 // ── Environment variable names ────────────────────────────────────────────────
@@ -118,6 +121,9 @@ const (
 	envGaplessAudio = "SUBSD_GAPLESS_AUDIO"
 
 	envMPRIS = "SUBSD_MPRIS"
+
+	envLyricsEnabled       = "SUBSD_LYRICS_ENABLED"
+	envLyricsLRCLibEnabled = "SUBSD_LYRICS_LRCLIB_ENABLED"
 
 	envRemoteURL   = "SUBSD_REMOTE_URL"
 	envRemoteToken = "SUBSD_REMOTE_TOKEN" //nolint:gosec
@@ -322,6 +328,16 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Usage:   "Enable MPRIS D-Bus integration for playerctl, Waybar, and desktop media key support (requires a D-Bus session bus)",
 		Sources: cli.EnvVars(envMPRIS),
 	},
+	&cli.BoolFlag{
+		Name:    flagLyricsEnabled,
+		Usage:   "Enable the lyrics feature (lyrics endpoint and UI button)",
+		Sources: cli.EnvVars(envLyricsEnabled),
+	},
+	&cli.BoolFlag{
+		Name:    flagLyricsLRCLibEnabled,
+		Usage:   "Enable LRCLIB (lrclib.net) as an external lyrics fallback when the Subsonic server has no lyrics (only meaningful when --lyrics-enabled is set)",
+		Sources: cli.EnvVars(envLyricsLRCLibEnabled),
+	},
 })
 
 func main() {
@@ -378,6 +394,8 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		CacheRefreshInterval: cmd.Duration(flagCacheRefreshInterval),
 		LibraryCacheTTL:      cmd.Duration(flagCacheLibraryTTL),
 		CoverArtCacheTTL:     cmd.Duration(flagCacheCoverArtTTL),
+		LyricsEnabled:        cmd.Bool(flagLyricsEnabled),
+		LyricsLRCLibEnabled:  cmd.Bool(flagLyricsLRCLibEnabled),
 	}
 
 	var (

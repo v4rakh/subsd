@@ -117,10 +117,12 @@ other, not both.
 
 #### Playback
 
-| Flag              | Environment           | Default | Description                                                                                                                                                     |
-| ----------------- | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--gapless-audio` | `SUBSD_GAPLESS_AUDIO` | `weak`  | Gapless audio mode: `yes` (always gapless), `weak` (only when audio format is compatible between tracks), `no` (disabled). Requires a daemon restart to change. |
-| `--mpris`         | `SUBSD_MPRIS`         | `false` | Enable MPRIS D-Bus integration — exposes playback controls to `playerctl`, Waybar, GNOME/KDE shell, and desktop media keys. Requires a D-Bus session bus.       |
+| Flag                      | Environment                   | Default | Description                                                                                                                                                     |
+| ------------------------- | ----------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--gapless-audio`         | `SUBSD_GAPLESS_AUDIO`         | `weak`  | Gapless audio mode: `yes` (always gapless), `weak` (only when audio format is compatible between tracks), `no` (disabled). Requires a daemon restart to change. |
+| `--mpris`                 | `SUBSD_MPRIS`                 | `false` | Enable MPRIS D-Bus integration — exposes playback controls to `playerctl`, Waybar, GNOME/KDE shell, and desktop media keys. Requires a D-Bus session bus.       |
+| `--lyrics-enabled`        | `SUBSD_LYRICS_ENABLED`        | `false` | Enable the lyrics endpoint (`GET /api/v1/lyrics/{id}`) and lyrics button in clients. Lyrics are fetched from the Subsonic server.                               |
+| `--lyrics-lrclib-enabled` | `SUBSD_LYRICS_LRCLIB_ENABLED` | `false` | Fall back to [lrclib.net](https://lrclib.net) for synced/plain lyrics when the Subsonic server returns none. Only meaningful when `--lyrics-enabled` is set.    |
 
 #### Satellites (gRPC)
 

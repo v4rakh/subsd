@@ -278,6 +278,21 @@ in
 
     mpris = lib.mkEnableOption "MPRIS D-Bus integration (SUBSD_MPRIS) for playerctl, Waybar, and desktop media key support";
 
+    lyrics = {
+      enabled = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable the lyrics feature (SUBSD_LYRICS_ENABLED). Exposes the lyrics endpoint and shows the lyrics button in clients.";
+      };
+      lrclib = {
+        enabled = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable LRCLIB (lrclib.net) as an external lyrics fallback (SUBSD_LYRICS_LRCLIB_ENABLED). Only meaningful when lyrics.enabled is true.";
+        };
+      };
+    };
+
     corsOrigins = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -408,7 +423,9 @@ in
           SUBSD_SATELLITE_RECONNECT_INTERVAL = cfg.satelliteReconnectInterval;
         }
         // lib.optionalAttrs (cfg.gaplessAudio != null) { SUBSD_GAPLESS_AUDIO = cfg.gaplessAudio; }
-        // lib.optionalAttrs cfg.mpris { SUBSD_MPRIS = "true"; };
+        // lib.optionalAttrs cfg.mpris { SUBSD_MPRIS = "true"; }
+        // lib.optionalAttrs cfg.lyrics.enabled { SUBSD_LYRICS_ENABLED = "true"; }
+        // lib.optionalAttrs cfg.lyrics.lrclib.enabled { SUBSD_LYRICS_LRCLIB_ENABLED = "true"; };
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/subsd";

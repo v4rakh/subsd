@@ -177,6 +177,7 @@ type fakeSubsonic struct {
 	song          *subsonic.Song
 	playlists     []subsonic.Playlist
 	playlist      *subsonic.Playlist
+	lyrics        *subsonic.Lyrics
 	searchResult  *subsonic.SearchResult
 	scrobbleCalls []string
 	coverArtURL   string
@@ -218,6 +219,12 @@ func (f *fakeSubsonic) GetPlaylist(_ context.Context, _ string) (*subsonic.Playl
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.playlist, f.err
+}
+
+func (f *fakeSubsonic) GetLyrics(_ context.Context, _ string) (*subsonic.Lyrics, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lyrics, f.err
 }
 
 func (f *fakeSubsonic) Search(_ context.Context, _ string) (*subsonic.SearchResult, error) {
@@ -292,6 +299,14 @@ func newTestServerWithToken(t *testing.T, token string) (*server.Server, *fakePl
 	fp := &fakePlayer{}
 	fs := &fakeSubsonic{}
 	srv := server.New(fs, fp, server.Config{Token: token}, testFS, nil)
+	return srv, fp, fs
+}
+
+func newTestServerWithConfig(t *testing.T, cfg server.Config) (*server.Server, *fakePlayer, *fakeSubsonic) {
+	t.Helper()
+	fp := &fakePlayer{}
+	fs := &fakeSubsonic{}
+	srv := server.New(fs, fp, cfg, testFS, nil)
 	return srv, fp, fs
 }
 
@@ -1253,5 +1268,51 @@ func TestEnqueueSong_TrackConversion(t *testing.T) {
 	}
 	if tr.Suffix != "flac" || tr.BitRate != 1000 || tr.SamplingRate != 44100 || tr.ChannelCount != 2 {
 		t.Errorf("audio metadata not forwarded: %+v", tr)
+	}
+}
+
+func TestHandleLyrics_Found(t *testing.T) {
+	srv, _, fs := newTestServerWithConfig(t, server.Config{LyricsEnabled: true})
+	fs.lyrics = &subsonic.Lyrics{
+		Synced: true,
+		Lines:  []subsonic.LyricLine{{Start: 1000, Value: "Hello world"}},
+	}
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/lyrics/song1", "")
+	assertOK(t, w)
+	var got subsonic.Lyrics
+	decodeJSON(t, w.Body, &got)
+	if !got.Synced {
+		t.Error("expected synced=true")
+	}
+	if len(got.Lines) != 1 || got.Lines[0].Value != "Hello world" {
+		t.Errorf("unexpected lines: %+v", got.Lines)
+	}
+}
+
+func TestHandleLyrics_NotFound(t *testing.T) {
+	srv, _, _ := newTestServerWithConfig(t, server.Config{LyricsEnabled: true})
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/lyrics/song1", "")
+	assertStatus(t, w, http.StatusNotFound)
+}
+
+func TestHandleSettings_LyricsDisabled(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/settings", "")
+	assertOK(t, w)
+	var got map[string]bool
+	decodeJSON(t, w.Body, &got)
+	if got["lyricsEnabled"] {
+		t.Error("expected lyricsEnabled=false")
+	}
+}
+
+func TestHandleSettings_LyricsEnabled(t *testing.T) {
+	srv, _, _ := newTestServerWithConfig(t, server.Config{LyricsEnabled: true})
+	w := doRequest(srv.Handler(), http.MethodGet, "/api/v1/settings", "")
+	assertOK(t, w)
+	var got map[string]bool
+	decodeJSON(t, w.Body, &got)
+	if !got["lyricsEnabled"] {
+		t.Error("expected lyricsEnabled=true")
 	}
 }

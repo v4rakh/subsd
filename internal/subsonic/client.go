@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -85,6 +86,16 @@ type SearchResult struct {
 	Songs   []Song   `json:"song,omitempty"`
 }
 
+type LyricLine struct {
+	Start int    `json:"start"`
+	Value string `json:"value"`
+}
+
+type Lyrics struct {
+	Synced bool        `json:"synced"`
+	Lines  []LyricLine `json:"lines"`
+}
+
 type Playlist struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -101,15 +112,17 @@ type response struct {
 }
 
 type subsonicResponse struct {
-	Status        string            `json:"status"`
-	Error         *subsonicError    `json:"error,omitempty"`
-	Artists       *artistsWrapper   `json:"artists,omitempty"`
-	Artist        *Artist           `json:"artist,omitempty"`
-	Album         *Album            `json:"album,omitempty"`
-	Song          *Song             `json:"song,omitempty"`
-	SearchResult2 *SearchResult     `json:"searchResult2,omitempty"`
-	Playlists     *playlistsWrapper `json:"playlists,omitempty"`
-	Playlist      *Playlist         `json:"playlist,omitempty"`
+	Status        string             `json:"status"`
+	Error         *subsonicError     `json:"error,omitempty"`
+	Artists       *artistsWrapper    `json:"artists,omitempty"`
+	Artist        *Artist            `json:"artist,omitempty"`
+	Album         *Album             `json:"album,omitempty"`
+	Song          *Song              `json:"song,omitempty"`
+	SearchResult2 *SearchResult      `json:"searchResult2,omitempty"`
+	Playlists     *playlistsWrapper  `json:"playlists,omitempty"`
+	Playlist      *Playlist          `json:"playlist,omitempty"`
+	Lyrics        *lyricsWrapper     `json:"lyrics,omitempty"`
+	LyricsList    *lyricsListWrapper `json:"lyricsList,omitempty"`
 }
 
 type subsonicError struct {
@@ -125,6 +138,24 @@ type artistsWrapper struct {
 
 type playlistsWrapper struct {
 	Playlists []Playlist `json:"playlist"`
+}
+
+type lyricsWrapper struct {
+	Value string `json:"value"`
+}
+
+type lyricsListWrapper struct {
+	StructuredLyrics []structuredLyrics `json:"structuredLyrics"`
+}
+
+type structuredLyrics struct {
+	Synced bool         `json:"synced"`
+	Lines  []lyricsLine `json:"line"`
+}
+
+type lyricsLine struct {
+	Start int    `json:"start"`
+	Value string `json:"value"`
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -193,6 +224,40 @@ func (c *Client) GetPlaylist(ctx context.Context, id string) (*Playlist, error) 
 		return nil, err
 	}
 	return resp.Playlist, nil
+}
+
+func (c *Client) GetLyrics(ctx context.Context, songID string) (*Lyrics, error) {
+	// Try getLyricsBySongId first (OpenSubsonic API 1.22.0, returns synced lines).
+	// Fall back to getLyrics (plain text) on any error or empty result.
+	resp, err := c.get(ctx, "getLyricsBySongId", url.Values{"id": {songID}})
+	if err == nil && resp.LyricsList != nil && len(resp.LyricsList.StructuredLyrics) > 0 {
+		sl := resp.LyricsList.StructuredLyrics[0]
+		if len(sl.Lines) > 0 {
+			lines := make([]LyricLine, len(sl.Lines))
+			for i, l := range sl.Lines {
+				lines[i] = LyricLine(l)
+			}
+			return &Lyrics{Synced: sl.Synced, Lines: lines}, nil
+		}
+	}
+
+	// Fall back to getLyrics (API 1.2.0). Needs artist+title, so fetch the song first.
+	song, err := c.GetSong(ctx, songID)
+	if err != nil {
+		return nil, nil //nolint:nilnil,nilerr
+	}
+	resp2, err := c.get(ctx, "getLyrics", url.Values{
+		"artist": {song.Artist},
+		"title":  {song.Title},
+	})
+	if err != nil || resp2.Lyrics == nil || strings.TrimSpace(resp2.Lyrics.Value) == "" {
+		return nil, nil //nolint:nilnil,nilerr
+	}
+	var lines []LyricLine
+	for _, l := range strings.Split(resp2.Lyrics.Value, "\n") {
+		lines = append(lines, LyricLine{Start: 0, Value: strings.TrimRight(l, "\r")})
+	}
+	return &Lyrics{Synced: false, Lines: lines}, nil
 }
 
 func (c *Client) Search(ctx context.Context, query string) (*SearchResult, error) {

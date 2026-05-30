@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, getSettings } from './api';
 import { AlbumPanel } from './components/AlbumPanel';
 import { ArtistPanel } from './components/ArtistPanel';
 import { NowPlaying } from './components/NowPlaying';
@@ -31,6 +31,7 @@ export default function App() {
 	const [showSearch, setShowSearch] = useState(false);
 	const [mobileTab, setMobileTab] = useState<MobileTab>('artists');
 	const [showOverlay, setShowOverlay] = useState(false);
+	const [lyricsEnabled, setLyricsEnabled] = useState(false);
 
 	const TABS: { id: MobileTab; label: string }[] = useMemo(
 		() => [
@@ -48,6 +49,12 @@ export default function App() {
 		lib.loadArtists();
 		lib.loadPlaylists();
 	}, [lib.loadArtists, lib.loadPlaylists]);
+
+	useEffect(() => {
+		getSettings()
+			.then((s) => setLyricsEnabled(s.lyricsEnabled))
+			.catch(() => { /* settings unavailable — keep default false */ });
+	}, []);
 
 	// Only show the connecting overlay if the WS hasn't connected within 300 ms.
 	// This avoids a flash on fast LAN connections and prevents the overlay from
@@ -254,6 +261,7 @@ export default function App() {
 				connected={connected}
 				theme={theme}
 				satellites={satellites}
+				lyricsEnabled={lyricsEnabled}
 				onThemeToggle={toggleTheme}
 				onOpenSearch={() => {
 					if (window.innerWidth >= 1024) setShowSearch(true);

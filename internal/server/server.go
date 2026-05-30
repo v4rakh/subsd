@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/singleflight"
 	"varakh.de/subsd/internal/cache"
+	"varakh.de/subsd/internal/lrclib"
 	"varakh.de/subsd/internal/player"
 	"varakh.de/subsd/internal/satellite"
 	"varakh.de/subsd/internal/subsonic"
@@ -37,6 +38,7 @@ type SubsonicClient interface {
 	UpdatePlaylist(ctx context.Context, id, name string, songIDsToAdd []string, songIndexesToRemove []int) error
 	ReplacePlaylistSongs(ctx context.Context, id string, songIDs []string) error
 	DeletePlaylist(ctx context.Context, id string) error
+	GetLyrics(ctx context.Context, id string) (*subsonic.Lyrics, error)
 	Search(ctx context.Context, query string) (*subsonic.SearchResult, error)
 	Scrobble(ctx context.Context, id string) error
 	SetRating(ctx context.Context, id string, rating int) error
@@ -154,6 +156,12 @@ func (m Mode) ServesAPI() bool { return m == ModeFull || m == ModeDaemon }
 // ServesFrontend reports whether the mode serves the embedded static frontend.
 func (m Mode) ServesFrontend() bool { return m == ModeFull || m == ModeFrontend }
 
+// LRCLibClient is the interface for fetching lyrics from an external LRCLIB provider.
+// Tests may substitute a fake implementation.
+type LRCLibClient interface {
+	GetLyrics(ctx context.Context, artist, title, album string, duration int) (*subsonic.Lyrics, error)
+}
+
 // Config holds the server's listen address and optional security settings.
 type Config struct {
 	Mode                 Mode // operating mode; zero value is ModeFull
@@ -168,6 +176,8 @@ type Config struct {
 	CacheRefreshInterval time.Duration // how often the background task re-warms the library cache; 0 disables periodic refresh
 	LibraryCacheTTL      time.Duration // TTL for artist/album/playlist entries; 0 uses default (5m)
 	CoverArtCacheTTL     time.Duration // TTL for cover art entries; 0 uses default (24h)
+	LyricsEnabled        bool          // enable the lyrics endpoint and UI button
+	LyricsLRCLibEnabled  bool          // enable LRCLIB as external lyrics fallback (only meaningful when LyricsEnabled)
 }
 
 // Server wires the Subsonic client, player, and WebSocket hub together.
@@ -187,6 +197,8 @@ type Server struct {
 	url            string
 	corsOrigins    string
 	cookieSameSite http.SameSite
+	lyricsEnabled  bool
+	lrclib         LRCLibClient // non-nil when LyricsLRCLibEnabled
 
 	artists   cache.Cache[string, []subsonic.Artist]
 	artist    cache.Cache[string, *subsonic.Artist]
@@ -245,6 +257,7 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, 
 		url:             cfg.URL,
 		corsOrigins:     cfg.CORSOrigins,
 		cookieSameSite:  cookieSameSite,
+		lyricsEnabled:   cfg.LyricsEnabled,
 		artists:         cache.NewTTL[string, []subsonic.Artist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		artist:          cache.NewTTL[string, *subsonic.Artist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		album:           cache.NewTTL[string, *subsonic.Album](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
@@ -289,6 +302,9 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, 
 				s.broadcastSatelliteDisconnected(name)
 			})
 		}
+	}
+	if cfg.LyricsEnabled && cfg.LyricsLRCLibEnabled {
+		s.lrclib = lrclib.New()
 	}
 	return s
 }
@@ -359,6 +375,14 @@ func (s *Server) Handler() http.Handler {
 		r.Post("/api/v1/playlist/from-queue", s.handleSaveQueueAsPlaylist)
 		r.Post("/api/v1/play/playlist/{id}", s.handlePlayPlaylist)
 		r.Post("/api/v1/queue/playlist/{id}", s.handleEnqueuePlaylist)
+
+		// ── Lyrics ────────────────────────────────────────────────────────
+		if s.lyricsEnabled {
+			r.Get("/api/v1/lyrics/{songId}", s.handleLyrics)
+		}
+
+		// ── Settings ──────────────────────────────────────────────────────────
+		r.Get("/api/v1/settings", s.handleSettings)
 
 		// ── Ratings ───────────────────────────────────────────────────────
 		r.Post("/api/v1/rating", s.handleSetRating)
@@ -765,6 +789,30 @@ func (s *Server) handlePlaylist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.json(w, pl)
+}
+
+func (s *Server) handleLyrics(w http.ResponseWriter, r *http.Request) {
+	songID := chi.URLParam(r, "songId")
+	lyrics, err := s.client.GetLyrics(r.Context(), songID)
+	if err != nil {
+		s.errorf(w, http.StatusBadGateway, "%v", err)
+		return
+	}
+	if lyrics == nil && s.lrclib != nil {
+		song, err := s.client.GetSong(r.Context(), songID)
+		if err == nil && song != nil {
+			lyrics, _ = s.lrclib.GetLyrics(r.Context(), song.Artist, song.Title, song.Album, song.Duration) //nolint:errcheck
+		}
+	}
+	if lyrics == nil {
+		s.errorf(w, http.StatusNotFound, "no lyrics available")
+		return
+	}
+	s.json(w, lyrics)
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
+	s.json(w, map[string]bool{"lyricsEnabled": s.lyricsEnabled})
 }
 
 func (s *Server) handlePlayPlaylist(w http.ResponseWriter, r *http.Request) {

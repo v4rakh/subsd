@@ -1,4 +1,5 @@
 import { getApiUrl } from './config';
+import type { Lyrics, Settings } from './types';
 
 export const AUTH_FAILURE_EVENT = 'subsd:authfailure';
 
@@ -13,4 +14,17 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
 		throw new Error('unauthorized');
 	}
 	return r;
+}
+
+export async function getLyrics(songId: string): Promise<Lyrics | null> {
+	const r = await apiFetch(`/api/v1/lyrics/${encodeURIComponent(songId)}`);
+	if (r.status === 404) return null;
+	if (!r.ok) throw new Error(`lyrics fetch failed: ${r.status}`);
+	return r.json();
+}
+
+export async function getSettings(): Promise<Settings> {
+	const r = await apiFetch('/api/v1/settings');
+	if (!r.ok) throw new Error(`settings fetch failed: ${r.status}`);
+	return r.json();
 }

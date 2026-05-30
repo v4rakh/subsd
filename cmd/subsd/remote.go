@@ -1030,6 +1030,52 @@ var remoteCommand = &cli.Command{
 				return c.post(ctx, "/api/v1/device", map[string]string{"name": name})
 			},
 		},
+		// ── Lyrics ────────────────────────────────────────────────────────
+		{
+			Name:      "lyrics",
+			Usage:     "Show lyrics for a song by Subsonic ID",
+			ArgsUsage: "<song-id>",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				id, err := requireArg(cmd, "song ID")
+				if err != nil {
+					return err
+				}
+				c, err := clientFromCmd(cmd)
+				if err != nil {
+					return err
+				}
+				data, status, err := c.request(ctx, http.MethodGet, "/api/v1/lyrics/"+id, nil)
+				if err != nil {
+					return err
+				}
+				if status == http.StatusNotFound {
+					fmt.Println("No lyrics available")
+					return nil
+				}
+				if status >= 300 {
+					return fmt.Errorf("server error %d: %s", status, string(data))
+				}
+				var result struct {
+					Synced bool `json:"synced"`
+					Lines  []struct {
+						Start int    `json:"start"`
+						Value string `json:"value"`
+					} `json:"lines"`
+				}
+				if err := json.Unmarshal(data, &result); err != nil {
+					return fmt.Errorf("parse lyrics: %w", err)
+				}
+				for _, l := range result.Lines {
+					if result.Synced {
+						secs := l.Start / 1000
+						fmt.Printf("[%d:%02d] %s\n", secs/60, secs%60, l.Value)
+					} else {
+						fmt.Println(l.Value)
+					}
+				}
+				return nil
+			},
+		},
 		// ── Cache ─────────────────────────────────────────────────────────
 		{
 			Name:  "cache",

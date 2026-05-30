@@ -19,6 +19,11 @@
     "submit": "unlock",
     "wrongToken": "Wrong token."
   },
+  "lyrics": {
+    "loading": "Loading lyrics…",
+    "noLyrics": "No lyrics available",
+    "title": "Lyrics"
+  },
   "nowPlaying": {
     "activeSatellite": "Active satellite",
     "audioDevice": "Audio output device",

@@ -1,4 +1,4 @@
-import { apiUrl, apiFetch } from '../api';
+import { apiUrl, apiFetch, getLyrics } from '../api';
 import type { PlayerControls } from '../hooks/usePlayer';
 import type { Theme } from '../hooks/useTheme';
 import {
@@ -7,6 +7,7 @@ import {
 	REPLAY_GAIN_TRACK,
 	REPLAY_GAIN_MODES,
 	type Track,
+	type Lyrics,
 	type PlayerState,
 	type ReplayGainMode,
 	type ScrobbleStatus,
@@ -14,6 +15,7 @@ import {
 	type SatelliteDevice
 } from '../types';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
 import { fmtDuration, fmtAudioMeta } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -33,7 +35,8 @@ import {
 	Radio,
 	RefreshCw,
 	Satellite,
-	Gauge
+	Gauge,
+	ScrollText
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +58,7 @@ interface Props {
 	connected: boolean;
 	theme: Theme;
 	satellites: SatelliteInfo[];
+	lyricsEnabled: boolean;
 	onThemeToggle: () => void;
 	onOpenSearch: () => void;
 	onRefreshCache: () => void;
@@ -295,12 +299,50 @@ function ReplayGainPopover({ mode, onChange }: { mode: string; onChange: (mode: 
 	);
 }
 
+function LyricsDialog({ track, open, onClose }: { track: Track | null; open: boolean; onClose: () => void }) {
+	const { t } = useTranslation();
+	const [lyrics, setLyrics] = useState<Lyrics | null | undefined>(undefined);
+
+	useEffect(() => {
+		if (!open || !track) return;
+		setLyrics(undefined);
+		getLyrics(track.id)
+			.then(setLyrics)
+			.catch(() => setLyrics(null));
+	}, [open, track?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={(o) => {
+				if (!o) onClose();
+			}}>
+			<DialogContent className="bg-bg1 border-border text-text sm:max-w-md max-h-[80vh] flex flex-col">
+				<DialogHeader>
+					<DialogTitle className="label-ui">{t('lyrics.title')}</DialogTitle>
+				</DialogHeader>
+				<div className="overflow-y-auto flex-1 pr-1">
+					{lyrics === undefined && <p className="text-dim text-sm">{t('lyrics.loading')}</p>}
+					{lyrics === null && <p className="text-dim text-sm">{t('lyrics.noLyrics')}</p>}
+					{lyrics &&
+						lyrics.lines.map((line, i) => (
+							<p key={i} className="text-sm leading-relaxed">
+								{line.value || '\u00a0'}
+							</p>
+						))}
+				</div>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export function NowPlaying({
 	playerState,
 	controls,
 	connected,
 	theme,
 	satellites,
+	lyricsEnabled,
 	onThemeToggle,
 	onOpenSearch,
 	onRefreshCache,
@@ -315,6 +357,7 @@ export function NowPlaying({
 	const activeSatellite = satellites.find((s) => s.active) ?? null;
 	const noActiveSatellite = satellites.length > 0 && activeSatellite === null;
 	const [currentDevice, setCurrentDevice] = useState('');
+	const [showLyrics, setShowLyrics] = useState(false);
 
 	useEffect(() => {
 		if (activeSatellite) setCurrentDevice(activeSatellite.activeDevice ?? '');
@@ -332,6 +375,7 @@ export function NowPlaying({
 
 	return (
 		<div className="bg-bg1 border-t border-border shrink-0 lg:pb-[env(safe-area-inset-bottom)]">
+			<LyricsDialog track={track} open={showLyrics} onClose={() => setShowLyrics(false)} />
 			{/* ── Desktop main bar ── */}
 			<div className="hidden lg:grid grid-cols-[1fr_max-content_1fr] items-center px-6 py-5 gap-x-6 pr-0.5! pl-0.5!">
 				{/* Track info — left column */}
@@ -422,7 +466,7 @@ export function NowPlaying({
 					</div>
 				</div>
 
-				{/* Audio device + satellite + replaygain + search + theme + dot — right column */}
+				{/* Audio device + satellite + replaygain + lyrics + search + theme + dot — right column */}
 				<div className="flex items-center justify-end gap-2 pr-2!">
 					{activeSatellite && (
 						<AudioDevicePopover
@@ -438,6 +482,16 @@ export function NowPlaying({
 						onSelect={handleSelectSatellite}
 					/>
 					<ReplayGainPopover mode={replayGain ?? REPLAY_GAIN_OFF} onChange={setReplayGain} />
+					{lyricsEnabled && track && (
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							className={cn('text-dim shrink-0', showLyrics && 'text-brand bg-muted')}
+							onClick={() => setShowLyrics((o) => !o)}
+							title={t('lyrics.title')}>
+							<ScrollText className="size-4" />
+						</Button>
+					)}
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -571,6 +625,16 @@ export function NowPlaying({
 					onSelect={handleSelectSatellite}
 				/>
 				<ReplayGainPopover mode={replayGain ?? REPLAY_GAIN_OFF} onChange={setReplayGain} />
+				{lyricsEnabled && track && (
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className={cn('text-dim', showLyrics && 'text-brand bg-muted')}
+						onClick={() => setShowLyrics((o) => !o)}
+						title={t('lyrics.title')}>
+						<ScrollText className="size-4" />
+					</Button>
+				)}
 				<Button
 					variant="ghost"
 					size="icon-sm"

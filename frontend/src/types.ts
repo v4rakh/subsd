@@ -96,6 +96,20 @@ export interface Playlist {
 	entry?: Song[];
 }
 
+export interface LyricLine {
+	start: number;
+	value: string;
+}
+
+export interface Lyrics {
+	synced: boolean;
+	lines: LyricLine[];
+}
+
+export interface Settings {
+	lyricsEnabled: boolean;
+}
+
 export interface SatelliteDevice {
 	id: string;
 	name: string;
