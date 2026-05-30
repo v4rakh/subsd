@@ -70,7 +70,7 @@
             inherit version;
             src = ./.;
             doCheck = false;
-            vendorHash = "sha256-PHV4lA5hSN8pMK2WmZk7rPw1GlREyJZ/vOrIeb6zBHk=";
+            vendorHash = "sha256-BlTvMZoXnMBL7bE4+pcRwOL56vFFgrtg9HjYNPc6ZbE=";
             ldflags = [
               "-s"
               "-w"

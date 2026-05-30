@@ -303,6 +303,11 @@ in
       description = "Gapless audio mode (SUBSD_GAPLESS_AUDIO): yes (always gapless), weak (only when audio format is compatible between tracks), no (disabled). Requires a daemon restart to take effect. Defaults to weak when unset.";
     };
 
+    mpris = lib.mkEnableOption "" // {
+      description = "Enable MPRIS D-Bus integration (SUBSD_MPRIS) for playerctl, Waybar, and desktop media key support. Requires a D-Bus session bus; system services typically do not have one — this works reliably only when running subsd as a user process or with the Home Manager module.";
+      default = false;
+    };
+
     corsOrigins = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -453,7 +458,8 @@ in
         // lib.optionalAttrs (cfg.satelliteReconnectInterval != null) {
           SUBSD_SATELLITE_RECONNECT_INTERVAL = cfg.satelliteReconnectInterval;
         }
-        // lib.optionalAttrs (cfg.gaplessAudio != null) { SUBSD_GAPLESS_AUDIO = cfg.gaplessAudio; };
+        // lib.optionalAttrs (cfg.gaplessAudio != null) { SUBSD_GAPLESS_AUDIO = cfg.gaplessAudio; }
+        // lib.optionalAttrs cfg.mpris { SUBSD_MPRIS = "true"; };
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/subsd";

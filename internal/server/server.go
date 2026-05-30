@@ -1390,9 +1390,13 @@ func corsMiddleware(origins string) func(http.Handler) http.Handler {
 // Authentication is carried by an HttpOnly session cookie set on successful login.
 // The /login and /config.json paths are always accessible. API and WebSocket paths
 // return 401 JSON when unauthenticated; everything else redirects to /login.
+// Cover art (/api/v1/coverart/*) is intentionally exempt: the images carry no
+// sensitive data, and desktop MPRIS consumers (Waybar, GNOME shell, dunst) fetch
+// mpris:artUrl without credentials.
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.token == "" || r.URL.Path == "/login" || r.URL.Path == "/config.json" {
+		if s.token == "" || r.URL.Path == "/login" || r.URL.Path == "/config.json" ||
+			strings.HasPrefix(r.URL.Path, "/api/v1/coverart/") {
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
+	"varakh.de/subsd/internal/mpris"
 	"varakh.de/subsd/internal/persistence"
 	"varakh.de/subsd/internal/player"
 	"varakh.de/subsd/internal/satellite"
@@ -68,6 +70,8 @@ const (
 	flagSatelliteReconnectInterval      = "satellite-reconnect-interval"
 
 	flagGaplessAudio = "gapless-audio"
+
+	flagMPRIS = "mpris"
 )
 
 // ── Environment variable names ────────────────────────────────────────────────
@@ -112,6 +116,8 @@ const (
 	envSatelliteReconnectInterval      = "SUBSD_SATELLITE_RECONNECT_INTERVAL"
 
 	envGaplessAudio = "SUBSD_GAPLESS_AUDIO"
+
+	envMPRIS = "SUBSD_MPRIS"
 
 	envRemoteURL   = "SUBSD_REMOTE_URL"
 	envRemoteToken = "SUBSD_REMOTE_TOKEN" //nolint:gosec
@@ -311,6 +317,11 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Value:   string(player.GaplessAudioWeak),
 		Sources: cli.EnvVars(envGaplessAudio),
 	},
+	&cli.BoolFlag{
+		Name:    flagMPRIS,
+		Usage:   "Enable MPRIS D-Bus integration for playerctl, Waybar, and desktop media key support (requires a D-Bus session bus)",
+		Sources: cli.EnvVars(envMPRIS),
+	},
 })
 
 func main() {
@@ -447,6 +458,10 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 			log.Info().Int("tracks", len(ps.Queue)).Str("dir", dataDir).Msg("state restored")
 		}
 
+		if mprisSvc := startMPRIS(cmd, pl); mprisSvc != nil {
+			defer mprisSvc.Close()
+		}
+
 		// Autosave: persist state on every player change. A 5s debounce
 		// coalesces rapid events (e.g. seeking). However, position ticks
 		// arrive every second and keep resetting the debounce, so the timer
@@ -544,6 +559,37 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
+// startMPRIS initialises the MPRIS D-Bus service if --mpris is set.
+// It returns nil (and logs a warning) when the session bus is unavailable.
+func startMPRIS(cmd *cli.Command, pl *player.Player) *mpris.Service {
+	if !cmd.Bool(flagMPRIS) {
+		return nil
+	}
+	daemonURL := cmd.String(flagURL)
+	if daemonURL == "" {
+		daemonURL = addrToURL(cmd.String(flagAddr))
+	}
+	svc, err := mpris.New(pl, daemonURL)
+	if err != nil {
+		log.Warn().Err(err).Msg("MPRIS unavailable, continuing without it")
+		return nil
+	}
+	return svc
+}
+
+// addrToURL converts a listen address (e.g. ":8080", "0.0.0.0:8080") to a
+// localhost HTTP URL suitable for local cover art access.
+func addrToURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
+}
+
 // satelliteName returns the value of --satellite-name, falling back to hostname.
 func satelliteName(cmd *cli.Command) string {
 	if n := cmd.String(flagSatelliteName); n != "" {
@@ -573,6 +619,10 @@ func runSatelliteMode(ctx context.Context, cmd *cli.Command) error {
 	}
 	pl := player.New(backend)
 	defer pl.Close()
+
+	if mprisSvc := startMPRIS(cmd, pl); mprisSvc != nil {
+		defer mprisSvc.Close()
+	}
 
 	grpcToken, err := resolveSecret(cmd.String(flagGRPCToken), cmd.String(flagGRPCTokenFile), "grpc-token")
 	if err != nil {

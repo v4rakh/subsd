@@ -120,6 +120,7 @@ other, not both.
 | Flag              | Environment           | Default | Description                                                                                                                                                     |
 | ----------------- | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--gapless-audio` | `SUBSD_GAPLESS_AUDIO` | `weak`  | Gapless audio mode: `yes` (always gapless), `weak` (only when audio format is compatible between tracks), `no` (disabled). Requires a daemon restart to change. |
+| `--mpris`         | `SUBSD_MPRIS`         | `false` | Enable MPRIS D-Bus integration — exposes playback controls to `playerctl`, Waybar, GNOME/KDE shell, and desktop media keys. Requires a D-Bus session bus.       |
 
 #### Satellites (gRPC)
 
