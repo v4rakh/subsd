@@ -22,7 +22,7 @@
       perSystem =
         { pkgs, config, ... }:
         let
-          version = "0.5.0";
+          version = "0.5.1";
           frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
             pname = "subsd-ui";
             inherit version;
