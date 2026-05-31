@@ -32,6 +32,9 @@ result
 result/
 result/**
 
+# Changelogs
+CHANGELOG.md
+
 # AI
 .claude/
 CLAUDE.md

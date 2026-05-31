@@ -1,0 +1,74 @@
+# git-cliff ~ default configuration file
+# https://git-cliff.org/docs/configuration
+#
+# Lines starting with "#" are comments.
+# Configuration options are organized into tables and keys.
+# See documentation for more information on available options.
+
+[changelog]
+# template for the changelog header
+header = """
+"""
+# template for the changelog body
+# https://keats.github.io/tera/docs/#introduction
+body = """
+{% if version %}\
+    ## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## UNRELEASED
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - \
+            {% if commit.breaking %}❗ **breaking** {% endif %}\
+            {{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}\n
+"""
+# template for the changelog footer
+footer = """
+"""
+# remove the leading and trailing s
+trim = true
+# postprocessors
+postprocessors = [
+    { pattern = '<REPO>', replace = "https://git.myservermanager.com/varakh/subsd" }, # replace repository URL
+]
+# render body even when there are no releases to process
+# render_always = true
+# output file path
+output = "CHANGELOG.md"
+
+[git]
+# parse the commits based on https://www.conventionalcommits.org
+conventional_commits = true
+# filter out the commits that are not conventional
+filter_unconventional = true
+# process each line of a commit as an individual commit
+split_commits = false
+# regex for preprocessing the commit messages
+commit_preprocessors = [
+    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/pulls/${2}))" },
+]
+# regex for parsing and grouping commits
+commit_parsers = [
+    { message = "^release", skip = true },
+    { message = "^chore\\(deps.*\\)", group = "<!-- 2 -->🧪 Dependencies" },
+    { message = "^feat\\(deps.*\\)", group = "<!-- 2 -->🧪 Dependencies" },
+    { message = "^feat\\(deps.*\\)!", group = "<!-- 2 -->🧪 Dependencies" },
+    { message = "^fix\\(deps.*\\)", group = "<!-- 2 -->🧪 Dependencies" },
+    { message = "^feat", group = "<!-- 0 -->🚀 Features" },
+    { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
+    { message = "^chore|^ci", group = "<!-- 3 -->⚙️ Miscellaneous Tasks" },
+    { message = "^misc", group = "<!-- 3 -->⚙️ Miscellaneous Tasks" },
+    { message = "^refactor", group = "<!-- 4 -->🚜 Refactor" },
+    { message = "^doc|^docs", group = "<!-- 5 -->📚 Documentation" },
+    { message = "^.", skip = true },
+]
+# filter out the commits that are not matched by commit parsers
+filter_commits = true
+# sort the tags topologically
+topo_order = false
+# sort the commits inside sections by oldest/newest order
+sort_commits = "oldest"
