@@ -143,7 +143,7 @@ function AudioDevicePopover({
 				<Headphones className="size-4" />
 			</Button>
 			{open && (
-				<div className="absolute bottom-full right-0 mb-2 min-w-[200px] max-w-[280px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
+				<div className="absolute bottom-full left-0 lg:left-auto lg:right-0 mb-2 min-w-[200px] max-w-[280px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
 					{devices.map((d) => (
 						<button
 							key={d.id}
@@ -209,7 +209,7 @@ function SatellitePopover({
 				<Satellite className="size-4" />
 			</Button>
 			{open && (
-				<div className="absolute bottom-full right-0 mb-2 min-w-[200px] max-w-[280px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
+				<div className="absolute bottom-full left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:right-0 mb-2 min-w-[200px] max-w-[280px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
 					{noActiveSatellite && (
 						<div className="px-4 py-2 text-xs text-yellow-500 border-b border-border">
 							{t('nowPlaying.noActiveSatellite')}
@@ -273,7 +273,7 @@ function ReplayGainPopover({ mode, onChange }: { mode: string; onChange: (mode: 
 				<Gauge className="size-4" />
 			</Button>
 			{open && (
-				<div className="absolute bottom-full right-0 mb-2 min-w-[140px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
+				<div className="absolute bottom-full left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:right-0 mb-2 min-w-[140px] bg-bg1 border border-border rounded-lg shadow-lg overflow-hidden z-50">
 					{REPLAY_GAIN_MODES.map((m) => (
 						<button
 							key={m}
@@ -467,108 +467,13 @@ export function NowPlaying({
 				</div>
 			</div>
 
-			{/* ── Mobile: track info row ── */}
-			<div className="flex lg:hidden items-center gap-4 px-6 pt-6 pb-4 pl-2! pr-2!">
+			{/* ── Mobile: row 1 — track info ── */}
+			<div className="flex lg:hidden items-center gap-4 px-4 pt-4 pb-2">
 				<TrackInfo track={track} />
-				<div className="flex items-center gap-1 shrink-0">
-					{activeSatellite && (
-						<AudioDevicePopover
-							devices={activeSatellite.devices ?? []}
-							current={currentDevice}
-							activeSatelliteName={activeSatellite.name}
-							setDevice={setCurrentDevice}
-						/>
-					)}
-					<SatellitePopover
-						satellites={satellites}
-						noActiveSatellite={noActiveSatellite}
-						onSelect={handleSelectSatellite}
-					/>
-					<ReplayGainPopover mode={replayGain ?? REPLAY_GAIN_OFF} onChange={setReplayGain} />
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						className="text-dim"
-						onClick={onRefreshCache}
-						title={t('nowPlaying.refreshLibrary')}>
-						<RefreshCw className="size-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						className="text-dim"
-						onClick={onOpenSearch}
-						title={t('searchPanel.title')}>
-						<SearchIcon className="size-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						className="text-dim"
-						onClick={onThemeToggle}
-						title={theme === 'dark' ? t('nowPlaying.lightMode') : t('nowPlaying.darkMode')}>
-						{theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-					</Button>
-					<ScrobbleDot lastScrobble={lastScrobble} />
-					<ConnectionDot connected={connected} />
-				</div>
 			</div>
 
-			{/* ── Mobile: controls row ── */}
-			<div className="flex lg:hidden items-center justify-center gap-5 px-6 pb-4">
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					className={cn('text-dim', shuffle && 'text-brand')}
-					onClick={controls.shuffle}
-					title={t('nowPlaying.shuffle')}>
-					<Shuffle className="size-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					className="text-dim"
-					disabled={noActiveSatellite}
-					onClick={controls.prev}
-					title={t('nowPlaying.previous')}>
-					<SkipBack className="size-5" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon"
-					className="text-bright hover:text-brand size-12"
-					disabled={noActiveSatellite}
-					onClick={controls.playPause}
-					title={
-						noActiveSatellite
-							? t('nowPlaying.noActiveSatellite')
-							: playing
-								? t('nowPlaying.pause')
-								: t('nowPlaying.play')
-					}>
-					{playing ? <Pause className="size-6" /> : <Play className="size-6" />}
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					className="text-dim"
-					disabled={noActiveSatellite}
-					onClick={controls.next}
-					title={t('nowPlaying.next')}>
-					<SkipForward className="size-5" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					className={cn('text-dim', repeat && 'text-brand')}
-					onClick={controls.repeat}
-					title={t('nowPlaying.repeat')}>
-					<Repeat2 className="size-4" />
-				</Button>
-			</div>
-
-			{/* ── Mobile: seek bar ── */}
-			<div className="flex lg:hidden items-center gap-2 px-6 pb-5 pl-2! pr-2!">
+			{/* ── Mobile: row 2 — seek / progress ── */}
+			<div className="flex lg:hidden items-center gap-2 px-4 pb-2">
 				<span className="text-xs text-dim w-8 text-right tabular-nums shrink-0">{fmtDuration(position)}</span>
 				<Slider
 					className="flex-1 [&_[data-slot=slider-track]]:h-2"
@@ -582,19 +487,116 @@ export function NowPlaying({
 				<span className="text-xs text-dim w-8 tabular-nums shrink-0">{fmtDuration(duration)}</span>
 			</div>
 
-			{/* ── Mobile: volume ── */}
-			<div className="flex lg:hidden items-center gap-2 px-6 pb-6 p-2!">
-				<Volume2 className="size-4 text-dim shrink-0" />
-				<Slider
-					key={`vol-mobile-${isDesktop}`}
-					className="flex-1"
-					min={0}
-					max={100}
-					step={1}
-					value={[volume]}
-					onValueChange={(v) => controls.setVolume(Array.isArray(v) ? v[0] : v)}
-					aria-label={t('nowPlaying.volume')}
+			{/* ── Mobile: row 3 — play controls (left) + volume (right) ── */}
+			<div className="flex lg:hidden items-center gap-2 px-4 pb-2">
+				<div className="flex items-center gap-3 shrink-0">
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className={cn('text-dim', shuffle && 'text-brand')}
+						onClick={controls.shuffle}
+						title={t('nowPlaying.shuffle')}>
+						<Shuffle className="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="text-dim"
+						disabled={noActiveSatellite}
+						onClick={controls.prev}
+						title={t('nowPlaying.previous')}>
+						<SkipBack className="size-5" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="text-bright hover:text-brand size-12"
+						disabled={noActiveSatellite}
+						onClick={controls.playPause}
+						title={
+							noActiveSatellite
+								? t('nowPlaying.noActiveSatellite')
+								: playing
+									? t('nowPlaying.pause')
+									: t('nowPlaying.play')
+						}>
+						{playing ? <Pause className="size-6" /> : <Play className="size-6" />}
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="text-dim"
+						disabled={noActiveSatellite}
+						onClick={controls.next}
+						title={t('nowPlaying.next')}>
+						<SkipForward className="size-5" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className={cn('text-dim', repeat && 'text-brand')}
+						onClick={controls.repeat}
+						title={t('nowPlaying.repeat')}>
+						<Repeat2 className="size-4" />
+					</Button>
+				</div>
+				<div className="flex items-center gap-2 flex-1 min-w-0">
+					<Volume2 className="size-4 text-dim shrink-0" />
+					<Slider
+						key={`vol-mobile-${isDesktop}`}
+						className="flex-1"
+						min={0}
+						max={100}
+						step={1}
+						value={[volume]}
+						onValueChange={(v) => controls.setVolume(Array.isArray(v) ? v[0] : v)}
+						aria-label={t('nowPlaying.volume')}
+					/>
+				</div>
+			</div>
+
+			{/* ── Mobile: row 4 — indicators & actions ── */}
+			<div className="flex lg:hidden items-center justify-center gap-1 px-4 pb-4">
+				{activeSatellite && (
+					<AudioDevicePopover
+						devices={activeSatellite.devices ?? []}
+						current={currentDevice}
+						activeSatelliteName={activeSatellite.name}
+						setDevice={setCurrentDevice}
+					/>
+				)}
+				<SatellitePopover
+					satellites={satellites}
+					noActiveSatellite={noActiveSatellite}
+					onSelect={handleSelectSatellite}
 				/>
+				<ReplayGainPopover mode={replayGain ?? REPLAY_GAIN_OFF} onChange={setReplayGain} />
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					className="text-dim"
+					onClick={onRefreshCache}
+					title={t('nowPlaying.refreshLibrary')}>
+					<RefreshCw className="size-4" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					className="text-dim"
+					onClick={onOpenSearch}
+					title={t('searchPanel.title')}>
+					<SearchIcon className="size-4" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					className="text-dim"
+					onClick={onThemeToggle}
+					title={theme === 'dark' ? t('nowPlaying.lightMode') : t('nowPlaying.darkMode')}>
+					{theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+				</Button>
+				<ScrobbleDot lastScrobble={lastScrobble} />
+				<ConnectionDot connected={connected} />
 			</div>
 		</div>
 	);
