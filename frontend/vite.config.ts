@@ -10,9 +10,9 @@ export default defineConfig({
 	},
 	server: {
 		proxy: {
-			'/api': 'http://localhost:8080',
-			'/login': 'http://localhost:8080',
-			'/ws': { target: 'ws://localhost:8080', ws: true }
+			'/api/v1': 'http://localhost:8080',
+			'/api/v1/ws': { target: 'ws://localhost:8080', ws: true },
+			'/login': 'http://localhost:8080'
 		}
 	},
 	build: {
