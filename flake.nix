@@ -90,6 +90,7 @@
               git-cliff
               gnumake
               go
+              golangci-lint
               grype
               nodejs_24
               pnpm
