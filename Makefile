@@ -59,6 +59,7 @@ test-frontend:
 checkstyle: checkstyle-frontend checkstyle-server
 
 checkstyle-server:
+	golangci-lint cache clean
 	golangci-lint run
 
 checkstyle-frontend:
@@ -67,6 +68,7 @@ checkstyle-frontend:
 checkstyle-fix: checkstyle-frontend-fix checkstyle-server-fix
 
 checkstyle-server-fix:
+	golangci-lint cache clean
 	golangci-lint run --fix
 
 checkstyle-frontend-fix:

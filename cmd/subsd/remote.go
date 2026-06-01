@@ -18,6 +18,11 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const (
+	keyName    = "name"
+	keySongIDs = "songIds"
+)
+
 // cliConfig is loaded from ~/.config/subsd/cli.toml.
 type cliConfig struct {
 	URL   string `toml:"url"`
@@ -94,7 +99,7 @@ func (c *remoteCLIClient) request(ctx context.Context, method, path string, body
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if c.token != "" {
-		req.AddCookie(&http.Cookie{Name: "subsd_token", Value: c.token})
+		req.AddCookie(&http.Cookie{Name: "subsd_token", Value: c.token}) //nolint:gosec
 	}
 
 	resp, err := c.http.Do(req) //nolint:gosec
@@ -356,7 +361,7 @@ var remoteCommand = &cli.Command{
 		{
 			Name:      "play-song",
 			Usage:     "Play a song immediately by Subsonic ID",
-			ArgsUsage: "<id>",
+			ArgsUsage: "<id>", //nolint:goconst
 			Action: func(ctx context.Context, cmd *cli.Command) error {
 				id, err := requireArg(cmd, "song ID")
 				if err != nil {
@@ -596,7 +601,7 @@ var remoteCommand = &cli.Command{
 				{
 					Name:      "save-as-playlist",
 					Usage:     "Save the current queue as a new playlist",
-					ArgsUsage: "<name>",
+					ArgsUsage: "<name>", //nolint:goconst
 					Action: func(ctx context.Context, cmd *cli.Command) error {
 						name, err := requireArg(cmd, "playlist name")
 						if err != nil {
@@ -606,7 +611,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/v1/playlist/from-queue", map[string]string{"name": name})
+						return c.post(ctx, "/api/v1/playlist/from-queue", map[string]string{keyName: name})
 					},
 				},
 				{
@@ -645,7 +650,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						data, status, err := c.request(ctx, http.MethodPost, "/api/v1/playlist", map[string]any{"name": name, "songIds": []string{}})
+						data, status, err := c.request(ctx, http.MethodPost, "/api/v1/playlist", map[string]any{keyName: name, keySongIDs: []string{}})
 						if err != nil {
 							return err
 						}
@@ -685,7 +690,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.put(ctx, "/api/v1/playlist/"+id, map[string]string{"name": name})
+						return c.put(ctx, "/api/v1/playlist/"+id, map[string]string{keyName: name})
 					},
 				},
 				{
@@ -702,7 +707,7 @@ var remoteCommand = &cli.Command{
 						if err != nil {
 							return err
 						}
-						return c.post(ctx, "/api/v1/playlist/"+playlistID+"/songs", map[string][]string{"songIds": {songID}})
+						return c.post(ctx, "/api/v1/playlist/"+playlistID+"/songs", map[string][]string{keySongIDs: {songID}})
 					},
 				},
 				{
@@ -787,7 +792,7 @@ var remoteCommand = &cli.Command{
 						moved := ids[from]
 						newIDs := append(ids[:from], ids[from+1:]...)
 						newIDs = append(newIDs[:to], append([]string{moved}, newIDs[to:]...)...)
-						return c.put(ctx, "/api/v1/playlist/"+playlistID+"/songs", map[string][]string{"songIds": newIDs})
+						return c.put(ctx, "/api/v1/playlist/"+playlistID+"/songs", map[string][]string{keySongIDs: newIDs})
 					},
 				},
 			},
@@ -947,7 +952,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/v1/satellites/active", map[string]string{"name": name})
+				return c.post(ctx, "/api/v1/satellites/active", map[string]string{keyName: name})
 			},
 		},
 		{
@@ -1027,7 +1032,7 @@ var remoteCommand = &cli.Command{
 				if err != nil {
 					return err
 				}
-				return c.post(ctx, "/api/v1/device", map[string]string{"name": name})
+				return c.post(ctx, "/api/v1/device", map[string]string{keyName: name})
 			},
 		},
 		// ── Lyrics ────────────────────────────────────────────────────────

@@ -1661,7 +1661,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	if subtle.ConstantTimeCompare([]byte(r.FormValue("token")), []byte(s.token)) == 1 {
-		http.SetCookie(w, &http.Cookie{
+		http.SetCookie(w, &http.Cookie{ //nolint:gosec
 			Name:     "subsd_token",
 			Value:    s.token,
 			Path:     "/",
