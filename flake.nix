@@ -84,6 +84,17 @@
           };
 
           packages.default = config.packages.server;
+
+          devShells.default = pkgs.mkShell {
+            packages = with pkgs; [
+              git-cliff
+              gnumake
+              go
+              grype
+              nodejs_24
+              pnpm
+            ];
+          };
         };
 
       flake = {

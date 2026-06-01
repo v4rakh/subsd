@@ -4,7 +4,7 @@ runs:
     - name: Security scan
       shell: bash
       run: |
-        make scan
+        nix develop --command bash -c "make scan"
     - name: Native - security scan result archival
       uses: actions/upload-artifact@v3
       with:

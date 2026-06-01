@@ -245,7 +245,7 @@ Major updates undergo manual review.
      - `flake.nix`: `version`
      - `frontend/package.json`: `version`
      - `cmd/main.go`: `Version`
-   - Make sure `make clean dependencies build checkstyle audit` is fine
+   - Make sure `make clean dependencies build-all checkstyle` is fine
    - Make sure `nix build` is fine (you need `nix` for it, update checksums in `flake.nix` if it fails)
      ```shell
      nix build .#packages.x86_64-linux.default -L
