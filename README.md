@@ -175,20 +175,29 @@ Afterward, start and enable it with `systemctl enable --now subsd.service`.
 
 ```shell
 [Unit]
-Description=subsd
 After=network.target
+Description=subsd Navidrome/Subsonic web-controlled music player
 
 [Service]
-Type=simple
-# Using a dynamic user drops privileges and sets some security defaults
-# Needs audio permissions
-# See https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html
-DynamicUser=yes
-# All environment variables for subsd can be put into this file
-# subsd picks them up (on each restart)
-EnvironmentFile=/etc/subsd.conf
-# Requires subsd binary to be installed at this location, e.g., via package manager or copying it over manually
-ExecStart=/usr/local/bin/subsd [options]
+Environment="SUBSD_SUBSONIC_HOST=http://...:4533"
+Environment="SUBSD_SUBSONIC_PASS_FILE=/run/secrets/subsd-password"
+Environment="SUBSD_SUBSONIC_USER_FILE=/run/secrets/subsd-user"
+ExecStart=subsd
+User=subsd
+Group=subsd
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/subsd
+Restart=on-failure
+RestartSec=5s
+StateDirectory=subsd
+StateDirectoryMode=0750
+SupplementaryGroups=audio
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## Development and contribution

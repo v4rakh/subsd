@@ -28,17 +28,17 @@ build-all: build-frontend build-server-all
 build-server-all:  build-server-freebsd-amd64 build-server-freebsd-arm64 build-server-darwin-amd64 build-server-darwin-arm64 build-server-linux-amd64 build-server-linux-arm64
 
 build-server-freebsd-amd64:
-	CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY)-freebsd-amd64 $(CMD)
+	CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -trimpath $(LDFLAGS) -o $(BINARY)-freebsd-amd64 $(CMD)
 build-server-freebsd-arm64:
-	CGO_ENABLED=0 GOOS=freebsd GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY)-freebsd-arm64 $(CMD)
+	CGO_ENABLED=0 GOOS=freebsd GOARCH=arm64 go build -trimpath $(LDFLAGS) -o $(BINARY)-freebsd-arm64 $(CMD)
 build-server-darwin-amd64:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY)-darwin-amd64 $(CMD)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath $(LDFLAGS) -o $(BINARY)-darwin-amd64 $(CMD)
 build-server-darwin-arm64:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY)-darwin-arm64 $(CMD)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath $(LDFLAGS) -o $(BINARY)-darwin-arm64 $(CMD)
 build-server-linux-amd64:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY)-linux-amd64 $(CMD)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath $(LDFLAGS) -o $(BINARY)-linux-amd64 $(CMD)
 build-server-linux-arm64:
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY)-linux-arm64 $(CMD)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath $(LDFLAGS) -o $(BINARY)-linux-arm64 $(CMD)
 
 dependencies: dependencies-frontend dependencies-server
 

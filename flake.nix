@@ -30,7 +30,7 @@
 
             nativeBuildInputs = with pkgs; [
               nodejs_24
-              pnpm_11
+              pnpm
               pnpmConfigHook
             ];
 
@@ -43,7 +43,6 @@
                 src
                 pnpmInstallFlags
                 ;
-              pnpm = pkgs.pnpm_11;
               fetcherVersion = 3;
               hash = "sha256-Wes4v84f42AdIQE8M8ybFCD0QWAOwmiJyWWZt1p5hOw=";
             };
