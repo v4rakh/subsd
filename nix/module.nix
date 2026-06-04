@@ -341,6 +341,28 @@ in
       default = null;
       description = "SameSite policy for the session cookie (SUBSD_COOKIE_SAMESITE). Use none for cross-origin daemon/frontend split — requires HTTPS (browsers reject none without Secure). Defaults to strict when unset.";
     };
+
+    securityHeaders = {
+      csp = {
+        enabled = lib.mkEnableOption "Content-Security-Policy header on the web interface (SUBSD_SH_CSP_ENABLED)";
+        value = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Custom CSP directive string (SUBSD_SH_CSP_VALUE). Uses a built-in default suitable for the embedded Vite/React SPA when unset.";
+        };
+      };
+      hsts = {
+        enabled = lib.mkEnableOption "Strict-Transport-Security header on the web interface (SUBSD_SH_HSTS_ENABLED). Only meaningful when TLS is active.";
+        maxAge = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "31536000s";
+          description = "max-age for HSTS as a Go duration string (SUBSD_SH_HSTS_MAX_AGE). Defaults to 365 days when unset.";
+        };
+        includeSubDomains = lib.mkEnableOption "includeSubDomains directive in the HSTS header (SUBSD_SH_HSTS_INCLUDE_SUB_DOMAINS)";
+        preload = lib.mkEnableOption "preload directive in the HSTS header (SUBSD_SH_HSTS_PRELOAD)";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -476,7 +498,19 @@ in
         // lib.optionalAttrs (cfg.gaplessAudio != null) { SUBSD_GAPLESS_AUDIO = cfg.gaplessAudio; }
         // lib.optionalAttrs cfg.mpris { SUBSD_MPRIS = "true"; }
         // lib.optionalAttrs cfg.lyrics.enabled { SUBSD_LYRICS_ENABLED = "true"; }
-        // lib.optionalAttrs cfg.lyrics.lrclib.enabled { SUBSD_LYRICS_LRCLIB_ENABLED = "true"; };
+        // lib.optionalAttrs cfg.lyrics.lrclib.enabled { SUBSD_LYRICS_LRCLIB_ENABLED = "true"; }
+        // lib.optionalAttrs cfg.securityHeaders.csp.enabled { SUBSD_SH_CSP_ENABLED = "true"; }
+        // lib.optionalAttrs (cfg.securityHeaders.csp.value != null) {
+          SUBSD_SH_CSP_VALUE = cfg.securityHeaders.csp.value;
+        }
+        // lib.optionalAttrs cfg.securityHeaders.hsts.enabled { SUBSD_SH_HSTS_ENABLED = "true"; }
+        // lib.optionalAttrs (cfg.securityHeaders.hsts.maxAge != null) {
+          SUBSD_SH_HSTS_MAX_AGE = cfg.securityHeaders.hsts.maxAge;
+        }
+        // lib.optionalAttrs cfg.securityHeaders.hsts.includeSubDomains {
+          SUBSD_SH_HSTS_INCLUDE_SUB_DOMAINS = "true";
+        }
+        // lib.optionalAttrs cfg.securityHeaders.hsts.preload { SUBSD_SH_HSTS_PRELOAD = "true"; };
 
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/subsd";

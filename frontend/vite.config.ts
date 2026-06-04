@@ -17,6 +17,11 @@ export default defineConfig({
 	},
 	build: {
 		outDir: '../web/dist',
-		emptyOutDir: true
+		emptyOutDir: true,
+		assetsInlineLimit(filePath: string) {
+			// Never inline fonts as data URIs so CSP font-src 'self' is sufficient.
+			if (/\.(woff2?|ttf|otf|eot)$/.test(filePath)) return false;
+			return undefined; // fall back to default 4096-byte threshold
+		}
 	}
 });

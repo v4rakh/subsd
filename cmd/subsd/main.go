@@ -75,6 +75,13 @@ const (
 
 	flagLyricsEnabled       = "lyrics-enabled"
 	flagLyricsLRCLibEnabled = "lyrics-lrclib-enabled"
+
+	flagShCspEnabled           = "sh-csp-enabled"
+	flagShCspValue             = "sh-csp-value"
+	flagShHstsEnabled          = "sh-hsts-enabled"
+	flagShHstsMaxAge           = "sh-hsts-max-age"
+	flagShHstsIncludeSubDomain = "sh-hsts-include-sub-domains"
+	flagShHstsPreload          = "sh-hsts-preload"
 )
 
 // ── Environment variable names ────────────────────────────────────────────────
@@ -124,6 +131,13 @@ const (
 
 	envLyricsEnabled       = "SUBSD_LYRICS_ENABLED"
 	envLyricsLRCLibEnabled = "SUBSD_LYRICS_LRCLIB_ENABLED"
+
+	envShCspEnabled           = "SUBSD_SH_CSP_ENABLED"
+	envShCspValue             = "SUBSD_SH_CSP_VALUE"
+	envShHstsEnabled          = "SUBSD_SH_HSTS_ENABLED"
+	envShHstsMaxAge           = "SUBSD_SH_HSTS_MAX_AGE"
+	envShHstsIncludeSubDomain = "SUBSD_SH_HSTS_INCLUDE_SUB_DOMAINS"
+	envShHstsPreload          = "SUBSD_SH_HSTS_PRELOAD"
 
 	envRemoteURL   = "SUBSD_REMOTE_URL"
 	envRemoteToken = "SUBSD_REMOTE_TOKEN" //nolint:gosec
@@ -338,6 +352,37 @@ var serveFlags = slices.Concat(commonFlags, []cli.Flag{
 		Usage:   "Enable LRCLIB (lrclib.net) as an external lyrics fallback when the Subsonic server has no lyrics (only meaningful when --lyrics-enabled is set)",
 		Sources: cli.EnvVars(envLyricsLRCLibEnabled),
 	},
+	&cli.BoolFlag{
+		Name:    flagShCspEnabled,
+		Usage:   "Emit Content-Security-Policy header for web interface responses",
+		Sources: cli.EnvVars(envShCspEnabled),
+	},
+	&cli.StringFlag{
+		Name:    flagShCspValue,
+		Usage:   "Content-Security-Policy directive string (uses a strict single-origin SPA default when not set)",
+		Sources: cli.EnvVars(envShCspValue),
+	},
+	&cli.BoolFlag{
+		Name:    flagShHstsEnabled,
+		Usage:   "Emit Strict-Transport-Security header for web interface responses (enable only when end-user connection is HTTPS)",
+		Sources: cli.EnvVars(envShHstsEnabled),
+	},
+	&cli.DurationFlag{
+		Name:    flagShHstsMaxAge,
+		Value:   8760 * time.Hour,
+		Usage:   "HSTS max-age duration (how long browsers cache the HSTS policy)",
+		Sources: cli.EnvVars(envShHstsMaxAge),
+	},
+	&cli.BoolFlag{
+		Name:    flagShHstsIncludeSubDomain,
+		Usage:   "Append includeSubDomains to the HSTS header value",
+		Sources: cli.EnvVars(envShHstsIncludeSubDomain),
+	},
+	&cli.BoolFlag{
+		Name:    flagShHstsPreload,
+		Usage:   "Append preload to the HSTS header value (requires --sh-hsts-include-sub-domains)",
+		Sources: cli.EnvVars(envShHstsPreload),
+	},
 })
 
 func main() {
@@ -396,6 +441,14 @@ func serveAction(ctx context.Context, cmd *cli.Command) error {
 		CoverArtCacheTTL:     cmd.Duration(flagCacheCoverArtTTL),
 		LyricsEnabled:        cmd.Bool(flagLyricsEnabled),
 		LyricsLRCLibEnabled:  cmd.Bool(flagLyricsLRCLibEnabled),
+		SecurityHeaders: server.SecurityHeadersConfig{
+			CspEnabled:            cmd.Bool(flagShCspEnabled),
+			CspValue:              cmd.String(flagShCspValue),
+			HstsEnabled:           cmd.Bool(flagShHstsEnabled),
+			HstsMaxAge:            cmd.Duration(flagShHstsMaxAge),
+			HstsIncludeSubDomains: cmd.Bool(flagShHstsIncludeSubDomain),
+			HstsPreload:           cmd.Bool(flagShHstsPreload),
+		},
 	}
 
 	var (

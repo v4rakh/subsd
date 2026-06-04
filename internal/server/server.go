@@ -88,6 +88,20 @@ type coverArtEntry struct {
 	contentType string
 }
 
+// defaultCspValue is the CSP directive string applied when CspEnabled is true
+// and CspValue is not overridden. Suitable for a single-origin Vite/React SPA.
+const defaultCspValue = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self'"
+
+// SecurityHeadersConfig holds configuration for security response headers on the web interface.
+type SecurityHeadersConfig struct {
+	CspEnabled            bool
+	CspValue              string
+	HstsEnabled           bool
+	HstsMaxAge            time.Duration
+	HstsIncludeSubDomains bool
+	HstsPreload           bool
+}
+
 const (
 
 	// artistsKey is the singleton cache key for the full artists list.
@@ -178,27 +192,29 @@ type Config struct {
 	CoverArtCacheTTL     time.Duration // TTL for cover art entries; 0 uses default (24h)
 	LyricsEnabled        bool          // enable the lyrics endpoint and UI button
 	LyricsLRCLibEnabled  bool          // enable LRCLIB as external lyrics fallback (only meaningful when LyricsEnabled)
+	SecurityHeaders      SecurityHeadersConfig
 }
 
 // Server wires the Subsonic client, player, and WebSocket hub together.
 type Server struct {
-	client         SubsonicClient
-	httpClient     *http.Client
-	player         PlayerController
-	satelliteCtrl  *SatelliteController // non-nil when satellite mode is active
-	registry       *satellite.Registry  // non-nil when satellite mode is active
-	mode           Mode
-	addr           string
-	token          string
-	tlsCert        string
-	tlsKey         string
-	readTimeout    time.Duration
-	staticFS       fs.FS
-	url            string
-	corsOrigins    string
-	cookieSameSite http.SameSite
-	lyricsEnabled  bool
-	lrclib         LRCLibClient // non-nil when LyricsLRCLibEnabled
+	client          SubsonicClient
+	httpClient      *http.Client
+	player          PlayerController
+	satelliteCtrl   *SatelliteController // non-nil when satellite mode is active
+	registry        *satellite.Registry  // non-nil when satellite mode is active
+	mode            Mode
+	addr            string
+	token           string
+	tlsCert         string
+	tlsKey          string
+	readTimeout     time.Duration
+	staticFS        fs.FS
+	url             string
+	corsOrigins     string
+	cookieSameSite  http.SameSite
+	lyricsEnabled   bool
+	lrclib          LRCLibClient // non-nil when LyricsLRCLibEnabled
+	securityHeaders SecurityHeadersConfig
 
 	artists   cache.Cache[string, []subsonic.Artist]
 	artist    cache.Cache[string, *subsonic.Artist]
@@ -258,6 +274,7 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, 
 		corsOrigins:     cfg.CORSOrigins,
 		cookieSameSite:  cookieSameSite,
 		lyricsEnabled:   cfg.LyricsEnabled,
+		securityHeaders: cfg.SecurityHeaders,
 		artists:         cache.NewTTL[string, []subsonic.Artist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		artist:          cache.NewTTL[string, *subsonic.Artist](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
 		album:           cache.NewTTL[string, *subsonic.Album](defaultDuration(cfg.LibraryCacheTTL, 5*time.Minute)),
@@ -415,7 +432,7 @@ func (s *Server) Handler() http.Handler {
 		// spaHandler falls back to index.html for any path that isn't a real
 		// file, so client-side routes (e.g. /login after an auth redirect)
 		// are handled by React instead of returning 404.
-		r.Handle("/*", spaHandler(s.staticFS))
+		r.Handle("/*", securityHeadersMiddleware(s.securityHeaders)(spaHandler(s.staticFS)))
 	}
 
 	return r
@@ -1675,6 +1692,33 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
 	w.Write([]byte(`{"error":"wrong token"}`)) //nolint:errcheck,gosec
+}
+
+// securityHeadersMiddleware sets Content-Security-Policy and Strict-Transport-Security
+// headers for the web interface when the respective options are enabled.
+func securityHeadersMiddleware(cfg SecurityHeadersConfig) func(http.Handler) http.Handler {
+	cspValue := cfg.CspValue
+	if cspValue == "" {
+		cspValue = defaultCspValue
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if cfg.CspEnabled {
+				w.Header().Set("Content-Security-Policy", cspValue)
+			}
+			if cfg.HstsEnabled {
+				hstsValue := fmt.Sprintf("max-age=%d", int(cfg.HstsMaxAge.Seconds()))
+				if cfg.HstsIncludeSubDomains {
+					hstsValue += "; includeSubDomains"
+				}
+				if cfg.HstsPreload {
+					hstsValue += "; preload"
+				}
+				w.Header().Set("Strict-Transport-Security", hstsValue)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // spaHandler wraps a file server with a single-page-application fallback:
