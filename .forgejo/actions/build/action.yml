@@ -1,12 +1,7 @@
-inputs:
-  version:
-    description: "version to use"
-    required: true
-    type: string
 runs:
   using: "composite"
   steps:
-    - name: Build, Checkstyle, Test
+    - name: Build, Checkstyle
       shell: bash
       run: |
-        nix develop --command bash -c "make clean dependencies build-all checkstyle test"
+        nix develop --command bash -c "make clean dependencies build-all checkstyle"

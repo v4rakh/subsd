@@ -13,8 +13,6 @@ jobs:
         name: Checkout
       - uses: ./.forgejo/actions/build
         name: Build
-        with:
-          version: ${{ inputs.version }}
       - uses: ./.forgejo/actions/scan
         name: Scan
         with:
