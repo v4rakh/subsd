@@ -44,7 +44,7 @@
                 pnpmInstallFlags
                 ;
               fetcherVersion = 3;
-              hash = "sha256-ZWBOBmwdQt2hK8iArse6lzpuAWMUFKnLgzFK7jKXJyg=";
+              hash = "sha256-T6AEEurUWpHrIKPu6NoT+EjqAQv1ol9BMq94BqJjjkM=";
             };
 
             buildPhase = ''
