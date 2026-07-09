@@ -4,12 +4,12 @@ go 1.26
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/rs/zerolog v1.35.1
-	github.com/urfave/cli/v3 v3.10.0
+	github.com/urfave/cli/v3 v3.10.1
 	golang.org/x/sync v0.21.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
