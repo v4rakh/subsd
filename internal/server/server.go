@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/singleflight"
 	"varakh.de/subsd/internal/cache"
@@ -331,7 +333,7 @@ func New(client SubsonicClient, p PlayerController, cfg Config, staticFS fs.FS, 
 func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(requestLogger)
-	r.Use(middleware.Recoverer)
+	r.Use(panicRecoverer)
 	if s.corsOrigins != "" {
 		r.Use(corsMiddleware(s.corsOrigins))
 	}
@@ -1738,6 +1740,32 @@ func spaHandler(fsys fs.FS) http.Handler {
 			r.URL.Path = "/"
 		}
 		fileServer.ServeHTTP(w, r)
+	})
+}
+
+// panicRecoverer is a chi middleware that catches panics, logs them via zerolog
+// with a stack trace, and returns HTTP 500. http.ErrAbortHandler is re-panicked
+// so the server can abort the response without logging noise.
+func panicRecoverer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rvr := recover(); rvr != nil {
+				if rvr == http.ErrAbortHandler {
+					panic(rvr)
+				}
+
+				stackTrace := debug.Stack()
+				panicErr := fmt.Errorf("%v", rvr)
+
+				log.Error().
+					Err(panicErr).
+					Str(zerolog.ErrorStackFieldName, string(stackTrace)).
+					Msg("panic")
+
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
 	})
 }
 

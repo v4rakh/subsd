@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime/debug"
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -78,9 +80,11 @@ func (g *GRPCServer) Start(addr string) error {
 		opts = append(opts, grpc.Creds(creds))
 		log.Info().Str("cert", g.tlsCert).Msg("satellite gRPC: TLS enabled")
 	}
+	interceptors := []grpc.StreamServerInterceptor{panicRecoveryStreamInterceptor()}
 	if g.token != "" {
-		opts = append(opts, grpc.StreamInterceptor(tokenStreamInterceptor(g.token)))
+		interceptors = append(interceptors, tokenStreamInterceptor(g.token))
 	}
+	opts = append(opts, grpc.ChainStreamInterceptor(interceptors...))
 
 	g.srv = grpc.NewServer(opts...)
 	satellitepb.RegisterSatelliteServiceServer(g.srv, g)
@@ -109,6 +113,27 @@ func tokenStreamInterceptor(token string) grpc.StreamServerInterceptor {
 		if len(vals) == 0 || vals[0] != token {
 			return status.Error(codes.Unauthenticated, "invalid or missing "+grpcTokenMetaKey)
 		}
+		return handler(srv, ss)
+	}
+}
+
+// panicRecoveryStreamInterceptor catches panics in any stream handler, logs them
+// with a stack trace, and returns an Internal gRPC error instead of crashing.
+func panicRecoveryStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				stackTrace := debug.Stack()
+				panicErr := fmt.Errorf("%v", r)
+
+				log.Error().
+					Err(panicErr).
+					Str("method", info.FullMethod).
+					Str(zerolog.ErrorStackFieldName, string(stackTrace)).
+					Msg("satellite gRPC: panic recovered")
+				err = status.Error(codes.Internal, "internal server error")
+			}
+		}()
 		return handler(srv, ss)
 	}
 }
