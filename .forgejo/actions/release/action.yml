@@ -11,7 +11,7 @@ runs:
   using: "composite"
   steps:
     - name: Upload artifacts
-      uses: ./.forgejo/actions/forgejo-release
+      uses: https://git.myservermanager.com/msm/forgejo-actions-forgejo-release@main
       with:
         url: https://git.myservermanager.com
         repo: varakh/subsd
