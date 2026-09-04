@@ -22,7 +22,6 @@
         "local>msm/renovate-presets//presets/frontend-minor-group-automerge.json",
         "local>msm/renovate-presets//presets/frontend-patch-group-automerge.json",
         "local>msm/renovate-presets//presets/frontend-recommended.json",
-        "local>msm/renovate-presets//presets/github-actions-ignore.json",
         "local>msm/renovate-presets//presets/go-ignore-manager.json",
         "local>msm/renovate-presets//presets/go-major.json",
         "local>msm/renovate-presets//presets/go-minor-group-automerge.json",
