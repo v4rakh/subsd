@@ -30,5 +30,6 @@
         "packages:eslint",
         "packages:stylelint",
         "packages:tslint",
+        "local>msm/renovate-presets//presets/github-actions-recommended.json",
     ],
 }
