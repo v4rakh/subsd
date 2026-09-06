@@ -3,7 +3,7 @@ jobs:
   build:
     runs-on: native
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         name: Checkout
       - uses: ./.forgejo/actions/build
         name: Build
