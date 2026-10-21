@@ -47,7 +47,7 @@ Add subsd as **Nix flakes** input:
 ```nix
 # flake.nix
 {
-  inputs.subsd.url = "git+https://git.myservermanager.com/varakh/subsd?ref=refs/tags/latest";
+  inputs.subsd.url = "git+https://git.myservermanager.com/varakh/subsd?ref=refs/tags/v0.2.1";
 }
 ```
 
